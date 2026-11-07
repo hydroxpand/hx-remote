@@ -11,6 +11,11 @@ on:
     tags:
       - "hx-*"
 
+permissions:
+  contents: write
+  actions: read
+  id-token: write
+
 jobs:
   build:
     uses: ./.github/workflows/flutter-build.yml
