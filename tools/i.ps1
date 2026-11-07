@@ -1,6 +1,6 @@
 # HX Remote one-line installer for Windows (ASCII only, no secrets in this file).
 # Usage on a PC (PowerShell):
-#   irm https://raw.githubusercontent.com/hydroxpand/hx-remote/hx/tools/i.ps1 -outfile $env:temp\i.ps1; powershell -ep bypass -f $env:temp\i.ps1 <password>
+#   irm https://raw.githubusercontent.com/hydroxpand/hx-remote/hx/tools/i.ps1 -outfile $env:temp\i.ps1; & "$pshome\powershell" -ep bypass -f $env:temp\i.ps1 <password>
 # Installs the latest HX Remote build as a service (public RustDesk servers), optionally sets the
 # unattended-access password, and prints the device ID. The elevated window stays open until Enter.
 param([string]$pw = "")
@@ -9,7 +9,8 @@ $ProgressPreference = "SilentlyContinue"   # PS5 progress bar makes Invoke-WebRe
 $me = $MyInvocation.MyCommand.Path
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
-  Start-Process powershell -Verb RunAs -ArgumentList "-ep bypass -f `"$me`" `"$pw`""
+  $ps = Join-Path $PSHOME "powershell.exe"   # full path: some PCs have WindowsPowerShell missing from PATH
+  Start-Process $ps -Verb RunAs -ArgumentList "-ep bypass -f `"$me`" `"$pw`""
   exit
 }
 $url = "https://github.com/hydroxpand/hx-remote/releases/download/hx-1.5.1-6/rustdesk-1.5.1-x86_64.exe"
