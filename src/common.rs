@@ -2500,6 +2500,11 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
 pub fn apply_hx_defaults() {
     const HX_APP_NAME: &str = "HX-Remote"; // installer rejects spaces (validate_install_app_name)
     *config::APP_NAME.write().unwrap() = HX_APP_NAME.to_owned();
+    // Display defaults for new connections (CEO request 261107): best image quality,
+    // and fit the remote screen to the window (original size looks tiny on Retina Macs).
+    let mut d = config::DEFAULT_DISPLAY_SETTINGS.write().unwrap();
+    d.insert("image_quality".to_owned(), "best".to_owned());
+    d.insert("view_style".to_owned(), "adaptive".to_owned());
 }
 
 pub fn load_custom_client() {
