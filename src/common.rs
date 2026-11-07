@@ -2495,7 +2495,7 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
 /// HX Remote: built-in defaults (server host, public key, app name).
 /// These are plain defaults, so the user can still change the server in Settings.
 pub fn apply_hx_defaults() {
-    const HX_APP_NAME: &str = "HX Remote";
+    const HX_APP_NAME: &str = "HX-Remote"; // installer rejects spaces (validate_install_app_name)
     const HX_HOST: &str = "remote.hydroxpand.com";
     const HX_KEY: &str = "Kth8ZlS/RbhqYY/NK29xrGsX9jg8LJOdbqwL2pOpDu8=";
     *config::APP_NAME.write().unwrap() = HX_APP_NAME.to_owned();
