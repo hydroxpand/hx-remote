@@ -2492,7 +2492,21 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
     ThrottledInterval::new(i)
 }
 
+/// HX Remote: built-in defaults (server host, public key, app name).
+/// These are plain defaults, so the user can still change the server in Settings.
+pub fn apply_hx_defaults() {
+    const HX_APP_NAME: &str = "HX Remote";
+    const HX_HOST: &str = "remote.hydroxpand.com";
+    const HX_KEY: &str = "Kth8ZlS/RbhqYY/NK29xrGsX9jg8LJOdbqwL2pOpDu8=";
+    *config::APP_NAME.write().unwrap() = HX_APP_NAME.to_owned();
+    let mut d = config::DEFAULT_SETTINGS.write().unwrap();
+    d.insert("custom-rendezvous-server".to_owned(), HX_HOST.to_owned());
+    d.insert("relay-server".to_owned(), HX_HOST.to_owned());
+    d.insert("key".to_owned(), HX_KEY.to_owned());
+}
+
 pub fn load_custom_client() {
+    apply_hx_defaults();
     #[cfg(debug_assertions)]
     if let Ok(data) = std::fs::read_to_string("./custom.txt") {
         read_custom_client(data.trim());

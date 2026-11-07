@@ -1,0 +1,21 @@
+name: HX Remote build
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish to (e.g. hx-1.5.1-1)"
+        required: true
+        default: "hx-1.5.1-1"
+  push:
+    tags:
+      - "hx-*"
+
+jobs:
+  build:
+    uses: ./.github/workflows/flutter-build.yml
+    secrets: inherit
+    with:
+      upload-artifact: true
+      upload-tag: ${{ inputs.tag || github.ref_name }}
+      publish-update-metadata: false
