@@ -5,6 +5,7 @@
 # unattended-access password, and prints the device ID. The elevated window stays open until Enter.
 param([string]$pw = "")
 $ErrorActionPreference = "Continue"
+$ProgressPreference = "SilentlyContinue"   # PS5 progress bar makes Invoke-WebRequest very slow
 $me = $MyInvocation.MyCommand.Path
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
