@@ -914,7 +914,7 @@ jobs:
             }
           - {
               target: aarch64-apple-darwin,
-              os: macos-14,
+              os: macos-15,  # HX: macos-14 arm64 runners are no longer provisioned
               # extra-build-args: "--disable-flutter-texture-render", # disable this for mac, because we see a lot of users reporting flickering both on arm and x64, and we can not confirm if texture rendering has better performance if htere is no vram, https://github.com/rustdesk/rustdesk/issues/6296
               extra-build-args: "--screencapturekit",
               extra-cargo-features: ",screencapturekit",
@@ -1096,6 +1096,9 @@ jobs:
       - name: create unsigned dmg
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
+          # HX: ad-hoc sign so the app launches on macOS without a Developer ID
+          #     (an unsigned main binary cannot load the Flutter framework: "different Team IDs").
+          codesign --force --deep --sign - ./flutter/build/macos/Build/Products/Release/RustDesk.app
           CREATE_DMG="$(command -v create-dmg)"
           CREATE_DMG="$(readlink -f "$CREATE_DMG")"
           sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
