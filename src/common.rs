@@ -2505,6 +2505,29 @@ pub fn apply_hx_defaults() {
     let mut d = config::DEFAULT_DISPLAY_SETTINGS.write().unwrap();
     d.insert("image_quality".to_owned(), "best".to_owned());
     d.insert("view_style".to_owned(), "adaptive".to_owned());
+    drop(d);
+    // Settings lock (CEO request 261108): people sitting at a company PC must not be able
+    // to break remote access by accident. Hidden in the app, but an admin can still change
+    // them from the command line (--password, --option), which is how we manage PCs.
+    let mut b = config::BUILTIN_SETTINGS.write().unwrap();
+    for k in [
+        "hide-security-settings", // security tab: permanent password, permissions
+        "hide-network-settings",  // network tab: ID/relay server, proxy
+        "hide-stop-service",      // "Stop service" in the app and the tray menu
+        "disable-change-id",
+    ] {
+        b.insert(k.to_owned(), "Y".to_owned());
+    }
+    drop(b);
+    // The built-in updater only knows official RustDesk releases; it would replace HX Remote.
+    config::OVERWRITE_SETTINGS
+        .write()
+        .unwrap()
+        .insert("allow-auto-update".to_owned(), "N".to_owned());
+    config::OVERWRITE_LOCAL_SETTINGS
+        .write()
+        .unwrap()
+        .insert("enable-check-update".to_owned(), "N".to_owned());
 }
 
 pub fn load_custom_client() {
