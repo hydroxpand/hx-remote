@@ -40,6 +40,7 @@ class ConnectionTabPage extends StatefulWidget {
 }
 
 class _ConnectionTabPageState extends State<ConnectionTabPage> {
+  final RxBool _gridMode = false.obs; // HX: grid of all open sessions
   final tabController =
       Get.put(DesktopTabController(tabType: DesktopTabType.remoteScreen));
   final contentKey = UniqueKey();
@@ -139,10 +140,12 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             _RelativeMouseModeHint(tabController: tabController),
+            GridViewButton(gridMode: _gridMode, controller: tabController),
             const AddButton(),
           ],
         ),
         selectedBorderColor: MyTheme.accent,
+        gridMode: _gridMode,
         pageViewBuilder: (pageView) => pageView,
         labelGetter: DesktopTab.tablabelGetter,
         tabBuilder: (key, icon, label, themeConf) => Obx(() {

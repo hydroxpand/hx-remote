@@ -252,6 +252,8 @@ class DesktopTab extends StatefulWidget {
   final Color? selectedTabBackgroundColor;
   final Color? unSelectedTabBackgroundColor;
   final Color? selectedBorderColor;
+  // HX: when set (remote desktop window), all open sessions can be shown at once as a grid.
+  final RxBool? gridMode;
 
   final DesktopTabController controller;
 
@@ -277,6 +279,7 @@ class DesktopTab extends StatefulWidget {
     this.selectedTabBackgroundColor,
     this.unSelectedTabBackgroundColor,
     this.selectedBorderColor,
+    this.gridMode,
   }) : super(key: key);
 
   static RxString tablabelGetter(String peerId) {
@@ -552,8 +555,97 @@ class _DesktopTabState extends State<DesktopTab>
     ]);
   }
 
+  /// HX: lays out remote sessions either one at a time (like the PageView) or all
+  /// at once as a grid. Both modes keep the same widget tree, so switching never
+  /// rebuilds a RemotePage (which would drop its connection). In the grid each
+  /// session is scaled down as a picture; a click on a cell opens that session
+  /// full size, and remote input is blocked so nothing is clicked by accident.
+  Widget _buildRemoteLayout() {
+    return Obx(() {
+      final tabs = state.value.tabs;
+      final selected = state.value.selected;
+      final grid = widget.gridMode!.value && tabs.length > 1;
+      return LayoutBuilder(builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final h = constraints.maxHeight;
+        final n = tabs.length;
+        final cols = grid ? sqrt(n).ceil() : 1;
+        final rows = grid ? (n / cols).ceil() : 1;
+        final cellW = w / cols;
+        final cellH = h / rows;
+        const gap = 3.0;
+        final children = <Widget>[];
+        for (var i = 0; i < n; i++) {
+          final tab = tabs[i];
+          final rect = grid
+              ? Rect.fromLTWH((i % cols) * cellW + gap, (i ~/ cols) * cellH + gap,
+                  max(cellW - gap * 2, 1), max(cellH - gap * 2, 1))
+              : Rect.fromLTWH(0, 0, w, h);
+          final isSel = i == selected;
+          children.add(Positioned.fromRect(
+            key: ValueKey('hx-grid-${tab.key}'),
+            rect: rect,
+            child: Offstage(
+              offstage: !grid && !isSel,
+              child: Stack(fit: StackFit.expand, children: [
+                ClipRect(
+                  child: FittedBox(
+                    fit: BoxFit.contain,
+                    child: SizedBox(width: w, height: h, child: tab.page),
+                  ),
+                ),
+                IgnorePointer(
+                  ignoring: !grid,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      widget.gridMode!.value = false;
+                      controller.jumpTo(i);
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: grid
+                              ? (isSel ? MyTheme.accent : Colors.white24)
+                              : Colors.transparent,
+                          width: grid ? 2 : 0,
+                        ),
+                      ),
+                      alignment: Alignment.bottomLeft,
+                      child: Offstage(
+                        offstage: !grid,
+                        child: Container(
+                          margin: const EdgeInsets.all(6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            DesktopTab.tablabelGetter(tab.key).value,
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+          ));
+        }
+        return Stack(children: children);
+      });
+    });
+  }
+
   List<Widget> _tabWidgets = [];
   Widget _buildPageView() {
+    if (tabType == DesktopTabType.remoteScreen && widget.gridMode != null) {
+      return Container(color: kColorCanvas, child: _buildRemoteLayout());
+    }
     final child = Container(
         child: Obx(() => PageView(
             controller: state.value.pageController,
@@ -1334,6 +1426,37 @@ class AddButton extends StatelessWidget {
         onTap: () => rustDeskWinManager.call(
             WindowType.Main, kWindowMainWindowOnTop, ""),
         isClose: false);
+  }
+}
+
+// HX: switches the remote window between one session at a time and a grid of all
+// open sessions. Shown only when two or more sessions are open.
+class GridViewButton extends StatelessWidget {
+  final RxBool gridMode;
+  final DesktopTabController controller;
+  const GridViewButton(
+      {Key? key, required this.gridMode, required this.controller})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      if (controller.state.value.tabs.length < 2) {
+        return const Offstage();
+      }
+      final on = gridMode.value;
+      return ActionIcon(
+          message: on ? '한 화면씩 보기' : '모아 보기 (바둑판)',
+          icon: on ? Icons.crop_square : Icons.grid_view,
+          onTap: () {
+            gridMode.value = !on;
+            if (!on) {
+              // nothing should type into a remote PC while watching the grid
+              FocusManager.instance.primaryFocus?.unfocus();
+            }
+          },
+          isClose: false);
+    });
   }
 }
 
