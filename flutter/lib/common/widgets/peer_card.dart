@@ -291,9 +291,13 @@ class _PeerCardState extends State<_PeerCard>
     final name = hideUsernameOnCard == true
         ? peer.hostname
         : '${peer.username}${peer.username.isNotEmpty && peer.hostname.isNotEmpty ? '@' : ''}${peer.hostname}';
-    // HX: last screen of this PC as the card background, if we have one
+    // HX: last screen of this PC as the card background; rebuilt when a new
+    // preview lands in the thumbs folder
+    final child = ValueListenableBuilder<int>(
+        valueListenable: HxThumbs.changes,
+        builder: (context, _, __) {
     final File? thumb = HxThumbs.latest(peer.id);
-    final child = Card(
+    return Card(
       color: Colors.transparent,
       elevation: 0,
       margin: EdgeInsets.zero,
@@ -402,6 +406,7 @@ class _PeerCardState extends State<_PeerCard>
         ),
       ),
     );
+        });
 
     final colors = _frontN(peer.tags, 25)
         .map((e) => gFFI.abModel.getCurrentAbTagColor(e))

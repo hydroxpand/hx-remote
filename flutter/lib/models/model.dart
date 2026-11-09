@@ -4361,10 +4361,13 @@ class FFI {
 
   // HX: take one quiet screenshot a few seconds after the first frame, for the
   // preview on this peer's card in the main window (see common/hx_thumbs.dart).
+  Timer? _hxThumbTimer;
   void _hxScheduleThumb() {
     if (!isDesktop || connType != ConnType.defaultConn) return;
-    Future.delayed(const Duration(seconds: 5), () {
-      if (closed || ffiModel.timerScreenshot != null) return;
+    void shoot() {
+      if (closed || ffiModel.timerScreenshot != null || ffiModel.hxThumbPending) {
+        return;
+      }
       final supported = bind.sessionGetCommonSync(
           sessionId: sessionId, key: 'is_screenshot_supported', param: '');
       if (supported != 'true') return;
@@ -4372,6 +4375,17 @@ class FFI {
       if (display == kAllDisplayValue) display = 0;
       ffiModel.hxThumbPending = true;
       bind.sessionTakeScreenshot(sessionId: sessionId, display: display);
+    }
+
+    Future.delayed(const Duration(seconds: 5), shoot);
+    // and refresh it every 5 minutes while the session stays open
+    _hxThumbTimer?.cancel();
+    _hxThumbTimer = Timer.periodic(const Duration(minutes: 5), (t) {
+      if (closed) {
+        t.cancel();
+        return;
+      }
+      shoot();
     });
   }
 

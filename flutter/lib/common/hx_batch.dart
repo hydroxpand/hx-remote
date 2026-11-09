@@ -7,7 +7,9 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../common.dart';
@@ -15,6 +17,7 @@ import '../models/model.dart';
 import '../models/peer_model.dart';
 import '../models/platform_model.dart';
 import '../models/terminal_model.dart';
+import '../utils/multi_window_manager.dart';
 
 const _kDone = '__HX_DONE__';
 // Typed after the command. The marker is built from two strings so that the echo
@@ -156,11 +159,50 @@ Future<void> hxRunOnPeer(HxBatchResult r, String command,
   }
 }
 
+// Saved commands (name, command), kept in the local option below as JSON.
+const _kSavedKey = 'hx-batch-commands';
+const List<List<String>> _kDefaultCommands = [
+  [
+    '디스크 여유',
+    r"Get-PSDrive -PSProvider FileSystem | Select-Object Name,@{n='FreeGB';e={[int]($_.Free/1GB)}},@{n='UsedGB';e={[int]($_.Used/1GB)}} | Format-Table -AutoSize | Out-String -Width 200"
+  ],
+  [
+    '켜진 프로그램',
+    r"Get-Process | Where-Object MainWindowTitle | Sort-Object ProcessName | Select-Object ProcessName,MainWindowTitle | Format-Table -AutoSize | Out-String -Width 200"
+  ],
+  [
+    'IP 주소',
+    r"Get-NetIPAddress -AddressFamily IPv4 | Where-Object IPAddress -notlike '127.*' | Select-Object InterfaceAlias,IPAddress | Format-Table -AutoSize | Out-String -Width 200"
+  ],
+  [
+    '켜진 시간',
+    r"$b=(Get-CimInstance Win32_OperatingSystem).LastBootUpTime; 'boot: ' + $b + '  (' + [int]((Get-Date)-$b).TotalHours + ' h ago)'"
+  ],
+];
+
+List<List<String>> _loadSaved() {
+  try {
+    final raw = bind.mainGetLocalOption(key: _kSavedKey);
+    if (raw.isNotEmpty) {
+      return (jsonDecode(raw) as List)
+          .map((e) => (e as List).map((x) => x.toString()).toList())
+          .where((e) => e.length == 2)
+          .toList();
+    }
+  } catch (_) {}
+  return _kDefaultCommands.map((e) => List<String>.from(e)).toList();
+}
+
+void _storeSaved(List<List<String>> v) {
+  bind.mainSetLocalOption(key: _kSavedKey, value: jsonEncode(v));
+}
+
 /// Dialog: one command for the selected PCs, results per PC.
 void hxShowBatchCommandDialog(List<Peer> peers) {
   final cmd = TextEditingController();
   final results = <HxBatchResult>[].obs;
   final running = false.obs;
+  final saved = _loadSaved().obs;
   gFFI.dialogManager.show((setState, close, context) {
     Future<void> run() async {
       final c = cmd.text.trim();
@@ -190,18 +232,79 @@ void hxShowBatchCommandDialog(List<Peer> peers) {
                   fontSize: 12, color: Theme.of(context).hintColor),
             ),
             const SizedBox(height: 8),
-            TextField(
-              controller: cmd,
-              autofocus: true,
-              minLines: 1,
-              maxLines: 4,
-              style: mono,
-              decoration: const InputDecoration(
-                hintText: r'예: hostname; Get-PSDrive C | Select-Object Used,Free',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              onSubmitted: (_) => run(),
+            // saved commands: click to fill, x to remove
+            Obx(() => Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    for (var i = 0; i < saved.length; i++)
+                      InputChip(
+                        label: Text(saved[i][0],
+                            style: const TextStyle(fontSize: 12)),
+                        tooltip: saved[i][1],
+                        onPressed: () {
+                          cmd.text = saved[i][1];
+                          cmd.selection = TextSelection.collapsed(
+                              offset: cmd.text.length);
+                        },
+                        onDeleted: () {
+                          saved.removeAt(i);
+                          _storeSaved(saved.toList());
+                        },
+                        deleteIconColor: Colors.grey,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                  ],
+                )),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: cmd,
+                    autofocus: true,
+                    minLines: 1,
+                    maxLines: 4,
+                    style: mono,
+                    decoration: const InputDecoration(
+                      hintText:
+                          r'예: hostname; Get-PSDrive C | Select-Object Used,Free',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onSubmitted: (_) => run(),
+                  ),
+                ),
+                // explicit paste: Cmd+V did not reach this field in a test
+                IconButton(
+                  tooltip: '붙여넣기',
+                  icon: const Icon(Icons.content_paste, size: 18),
+                  onPressed: () async {
+                    final d = await Clipboard.getData(Clipboard.kTextPlain);
+                    final t = d?.text ?? '';
+                    if (t.isEmpty) return;
+                    final sel = cmd.selection;
+                    final start = sel.isValid ? sel.start : cmd.text.length;
+                    final end = sel.isValid ? sel.end : cmd.text.length;
+                    cmd.text = cmd.text.replaceRange(start, end, t);
+                    cmd.selection =
+                        TextSelection.collapsed(offset: start + t.length);
+                  },
+                ),
+                IconButton(
+                  tooltip: '이 명령 저장',
+                  icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+                  onPressed: () {
+                    final c = cmd.text.trim();
+                    if (c.isEmpty) return;
+                    if (saved.any((e) => e[1] == c)) return;
+                    final name = c.length > 18 ? '${c.substring(0, 18)}…' : c;
+                    saved.add([name, c]);
+                    _storeSaved(saved.toList());
+                  },
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             Obx(() => ConstrainedBox(
@@ -255,4 +358,30 @@ void hxShowBatchCommandDialog(List<Peer> peers) {
       onCancel: close,
     );
   });
+}
+
+/// HX: open all selected PCs as tabs of one remote window and switch that window
+/// to the grid view (see DesktopTab._buildRemoteLayout). PCs without a saved
+/// password ask for it in their tab as usual.
+const kHxWindowEventGridOn = 'hx_grid_on';
+
+Future<void> hxOpenPeersAsGrid(List<String> ids) async {
+  int? win;
+  for (var i = 0; i < ids.length; i++) {
+    try {
+      final r = await rustDeskWinManager.newRemoteDesktop(ids[i]);
+      win ??= r.windowId;
+    } catch (e) {
+      debugPrint('[HX] open ${ids[i]} failed: $e');
+    }
+    // the first call creates the window; give it time to start listening
+    await Future.delayed(Duration(milliseconds: i == 0 ? 2500 : 800));
+  }
+  if (win != null && ids.length > 1) {
+    try {
+      await DesktopMultiWindow.invokeMethod(win, kHxWindowEventGridOn, '');
+    } catch (e) {
+      debugPrint('[HX] grid on failed: $e');
+    }
+  }
 }

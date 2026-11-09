@@ -366,6 +366,7 @@ class _PeerTabPageState extends State<PeerTabPage>
           offstage: model.selectedPeers.isEmpty,
           child: Row(
             children: [
+              hxOpenAsGridSelection(),
               hxBatchCommandSelection(),
               deleteSelection(),
               addSelectionToFav(),
@@ -383,6 +384,21 @@ class _PeerTabPageState extends State<PeerTabPage>
         )
       ],
     );
+  }
+
+  // HX: open all selected PCs at once and show them as a grid
+  Widget hxOpenAsGridSelection() {
+    final model = Provider.of<PeerTabModel>(context);
+    if (!(isDesktop || isWebDesktop) || isWeb) return Offstage();
+    return _hoverAction(
+        context: context,
+        toolTip: '모아 보기 (선택한 PC 한 번에 열기)',
+        onTap: () {
+          final ids = model.selectedPeers.map((e) => e.id).toList();
+          model.setMultiSelectionMode(false);
+          hxOpenPeersAsGrid(ids);
+        },
+        child: const Icon(Icons.grid_view));
   }
 
   // HX: send one command to all selected PCs (common/hx_batch.dart)

@@ -3,13 +3,21 @@
 // (see FFI._hxScheduleThumb), and peer cards show the newest one as their
 // background. Files live in <app support dir>/hx_thumbs/<peer id>_<time>.png;
 // a new name per capture avoids stale image-cache hits, older files are deleted.
+import 'dart:async';
 import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 
 import 'package:path_provider/path_provider.dart';
 
 class HxThumbs {
   static String? _dir;
   static Future<String>? _init;
+
+  /// Bumped whenever a preview file is added or removed (folder watch), so peer
+  /// cards in the main window pick up a preview saved by a remote window.
+  static final ValueNotifier<int> changes = ValueNotifier<int>(0);
+  static StreamSubscription<FileSystemEvent>? _watch;
 
   static Future<String> dir() {
     if (_dir != null) return Future.value(_dir!);
@@ -18,6 +26,10 @@ class HxThumbs {
       final d = Directory('${base.path}${Platform.pathSeparator}hx_thumbs');
       if (!d.existsSync()) d.createSync(recursive: true);
       _dir = d.path;
+      try {
+        _watch ??= d.watch().listen((_) => changes.value++);
+      } catch (_) {}
+      changes.value++;
       return d.path;
     }();
   }

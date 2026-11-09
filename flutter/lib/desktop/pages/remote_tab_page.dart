@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
+import 'package:flutter_hbb/common/hx_batch.dart' show kHxWindowEventGridOn;
 import 'package:flutter_hbb/common/shared_state.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/input_model.dart';
@@ -428,6 +429,11 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
         "[Remote Page] call ${call.method} with args ${call.arguments} from window $fromWindowId");
 
     dynamic returnValue;
+    if (call.method == kHxWindowEventGridOn) {
+      // HX: sent by the main window after opening several PCs at once
+      _gridMode.value = true;
+      return null;
+    }
     // for simplify, just replace connectionId
     if (call.method == kWindowEventNewRemoteDesktop) {
       final args = jsonDecode(call.arguments);
