@@ -24,3 +24,20 @@ jobs:
       upload-artifact: true
       upload-tag: ${{ inputs.tag || github.ref_name }}
       publish-update-metadata: false
+
+  # HX: SHA256SUMS for the release, used by tools/i.ps1 and the auto-update task (tools/hxupdate.ps1).
+  # The updater only picks releases that have this file, so it also marks a build as complete.
+  checksums:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write SHA256SUMS
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          mkdir dl && cd dl
+          gh release download "$TAG" -R "${{ github.repository }}" -p 'rustdesk-*'
+          sha256sum rustdesk-* > SHA256SUMS
+          cat SHA256SUMS
+          gh release upload "$TAG" SHA256SUMS -R "${{ github.repository }}" --clobber
