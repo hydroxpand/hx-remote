@@ -24,6 +24,7 @@ import 'package:pull_down_button/pull_down_button.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../common.dart';
+import '../hx_batch.dart';
 import '../../models/platform_model.dart';
 
 class PeerTabPage extends StatefulWidget {
@@ -365,6 +366,7 @@ class _PeerTabPageState extends State<PeerTabPage>
           offstage: model.selectedPeers.isEmpty,
           child: Row(
             children: [
+              hxBatchCommandSelection(),
               deleteSelection(),
               addSelectionToFav(),
               addSelectionToAb(),
@@ -381,6 +383,21 @@ class _PeerTabPageState extends State<PeerTabPage>
         )
       ],
     );
+  }
+
+  // HX: send one command to all selected PCs (common/hx_batch.dart)
+  Widget hxBatchCommandSelection() {
+    final model = Provider.of<PeerTabModel>(context);
+    if (!(isDesktop || isWebDesktop) || isWeb) return Offstage();
+    return _hoverAction(
+        context: context,
+        toolTip: '명령 보내기 (선택한 PC 모두)',
+        onTap: () {
+          final peers = model.selectedPeers.map((e) => Peer.copy(e)).toList();
+          model.setMultiSelectionMode(false);
+          hxShowBatchCommandDialog(peers);
+        },
+        child: const Icon(Icons.terminal));
   }
 
   Widget deleteSelection() {
