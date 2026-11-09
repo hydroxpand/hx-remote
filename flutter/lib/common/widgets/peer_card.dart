@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +12,7 @@ import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
 import '../../common.dart';
+import '../hx_thumbs.dart';
 import '../../common/formatter/id_formatter.dart';
 import '../../models/peer_model.dart';
 import '../../models/platform_model.dart';
@@ -288,6 +291,8 @@ class _PeerCardState extends State<_PeerCard>
     final name = hideUsernameOnCard == true
         ? peer.hostname
         : '${peer.username}${peer.username.isNotEmpty && peer.hostname.isNotEmpty ? '@' : ''}${peer.hostname}';
+    // HX: last screen of this PC as the card background, if we have one
+    final File? thumb = HxThumbs.latest(peer.id);
     final child = Card(
       color: Colors.transparent,
       elevation: 0,
@@ -306,7 +311,18 @@ class _PeerCardState extends State<_PeerCard>
               children: [
                 Expanded(
                   child: Container(
-                    color: str2color('${peer.id}${peer.platform}', 0x7f),
+                    decoration: BoxDecoration(
+                      color: str2color('${peer.id}${peer.platform}', 0x7f),
+                      image: thumb == null
+                          ? null
+                          : DecorationImage(
+                              image: ResizeImage(FileImage(thumb), width: 480),
+                              fit: BoxFit.cover,
+                              colorFilter: ColorFilter.mode(
+                                  Colors.black.withOpacity(0.3),
+                                  BlendMode.darken),
+                            ),
+                    ),
                     child: Row(
                       children: [
                         Expanded(
@@ -315,8 +331,8 @@ class _PeerCardState extends State<_PeerCard>
                             children: [
                               Container(
                                 padding: const EdgeInsets.all(6),
-                                child:
-                                    getPlatformImage(peer.platform, size: 60),
+                                child: getPlatformImage(peer.platform,
+                                    size: thumb == null ? 60 : 22),
                               ),
                               Row(
                                 children: [

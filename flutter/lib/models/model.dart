@@ -39,6 +39,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:vector_math/vector_math.dart' show Vector2;
 
 import '../common.dart';
+import '../common/hx_thumbs.dart';
 import '../utils/image.dart' as img;
 import '../common/widgets/dialog.dart';
 import 'input_model.dart';
@@ -135,6 +136,8 @@ class FfiModel with ChangeNotifier {
   bool isRefreshing = false;
 
   Timer? timerScreenshot;
+  // HX: the next screenshot response is our automatic card preview, not a user request
+  bool hxThumbPending = false;
 
   Rect? get rect => _rect;
   bool get isOriginalResolutionSet =>
@@ -486,6 +489,19 @@ class FfiModel with ChangeNotifier {
     timerScreenshot?.cancel();
     timerScreenshot = null;
     final msg = evt['msg'] ?? '';
+    if (hxThumbPending) {
+      // HX: automatic preview for the peer card, save it quietly (no dialog)
+      hxThumbPending = false;
+      if (msg.isEmpty) {
+        () async {
+          final path = await HxThumbs.newPath(peerId);
+          final res = await bind.sessionHandleScreenshot(
+              sessionId: sessionId, action: '0:$path');
+          if (res.isEmpty) HxThumbs.prune(peerId, path);
+        }();
+      }
+      return;
+    }
     final msgBoxType = 'custom-nook-nocancel-hasclose';
     final msgBoxTitle = 'Take screenshot';
     final dialogManager = parent.target!.dialogManager;
@@ -4339,7 +4355,24 @@ class FFI {
       } finally {
         _applyPendingMonitorRestore();
       }
+      _hxScheduleThumb();
     }
+  }
+
+  // HX: take one quiet screenshot a few seconds after the first frame, for the
+  // preview on this peer's card in the main window (see common/hx_thumbs.dart).
+  void _hxScheduleThumb() {
+    if (!isDesktop || connType != ConnType.defaultConn) return;
+    Future.delayed(const Duration(seconds: 5), () {
+      if (closed || ffiModel.timerScreenshot != null) return;
+      final supported = bind.sessionGetCommonSync(
+          sessionId: sessionId, key: 'is_screenshot_supported', param: '');
+      if (supported != 'true') return;
+      var display = ffiModel.pi.currentDisplay;
+      if (display == kAllDisplayValue) display = 0;
+      ffiModel.hxThumbPending = true;
+      bind.sessionTakeScreenshot(sessionId: sessionId, display: display);
+    });
   }
 
   void _applyPendingMonitorRestore() {
