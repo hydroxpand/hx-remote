@@ -2505,6 +2505,8 @@ pub fn apply_hx_defaults() {
     let mut d = config::DEFAULT_DISPLAY_SETTINGS.write().unwrap();
     d.insert("image_quality".to_owned(), "best".to_owned());
     d.insert("view_style".to_owned(), "adaptive".to_owned());
+    // Monitor buttons right on the remote toolbar instead of inside a menu (CEO request 261109)
+    d.insert("show_monitors_toolbar".to_owned(), "Y".to_owned());
     drop(d);
     // Settings lock (CEO request 261108): people sitting at a company PC must not be able
     // to break remote access by accident. Hidden in the app, but an admin can still change
