@@ -1160,13 +1160,13 @@ class _MonitorMenu extends StatelessWidget {
           if (isAllMonitors) {
             monitorsIcon = globalMonitorsWidget(
                 width, Colors.white, _ToolbarTheme.blueColor);
+          } else if (pi.displays.length > 1) {
+            // HX: draw the real monitor layout and fill only this button's monitor,
+            // so left/right is visible at a glance (numbers alone were confusing)
+            monitorsIcon = hxMonitorLayoutIcon(width, i, i == display.value);
           }
           return _IconMenuButton(
-            tooltip: isMulti
-                ? ''
-                : isAllMonitors
-                    ? 'All monitors'
-                    : '#{${i + 1}} monitor',
+            tooltip: hxMonitorTooltip(i, display.value),
             hMargin: isMulti ? null : 6,
             vMargin: isMulti ? null : 12,
             topLevel: false,
@@ -1176,8 +1176,8 @@ class _MonitorMenu extends StatelessWidget {
             hoverColor: i == display.value
                 ? _ToolbarTheme.hoverBlueColor
                 : _ToolbarTheme.hoverInactiveColor,
-            width: isAllMonitors ? width.value : null,
-            icon: isAllMonitors
+            width: monitorsIcon != null ? width.value : null,
+            icon: monitorsIcon != null
                 ? monitorsIcon
                 : Container(
                     alignment: AlignmentDirectional.center,
@@ -1206,6 +1206,77 @@ class _MonitorMenu extends StatelessWidget {
       monitorList.add(buildMonitorButton(kAllDisplayValue));
     }
     return monitorList;
+  }
+
+  // HX: tooltip with number, size and which one is on screen now
+  String hxMonitorTooltip(int i, int current) {
+    final pi = ffi.ffiModel.pi;
+    if (i == kAllDisplayValue) {
+      return '모든 모니터 한 화면에' + (current == i ? ' (지금 보는 중)' : '');
+    }
+    var t = '모니터 ${i + 1}';
+    if (i < pi.displays.length) {
+      final d = pi.displays[i];
+      t += '  ${d.width}×${d.height}';
+      if (d.x == 0 && d.y == 0) t += ', 주 모니터'; // Windows puts the primary at 0,0
+    }
+    if (current == i) t += '  (지금 보는 중)';
+    return t;
+  }
+
+  // HX: monitor layout icon with monitor [highlight] filled (blue when it is the
+  // one being viewed, white otherwise) and the others drawn as faint outlines.
+  Widget hxMonitorLayoutIcon(
+      SimpleWrapper<double> width, int highlight, bool isCurrent) {
+    final pi = ffi.ffiModel.pi;
+    final rect = ffi.ffiModel.globalDisplaysRect();
+    if (rect == null) return Offstage();
+    final scale = _ToolbarTheme.buttonSize / rect.height * 0.7;
+    final height = rect.height * scale;
+    final startY = (_ToolbarTheme.buttonSize - height) * 0.5;
+    final startX = startY;
+    final children = <Widget>[];
+    for (var j = 0; j < pi.displays.length; j++) {
+      final d = pi.displays[j];
+      final s = d.scale;
+      final w = (d.width.toDouble() / s) * scale;
+      final h = (d.height.toDouble() / s) * scale;
+      final on = j == highlight;
+      children.add(Positioned(
+        left: (d.x - rect.left) * scale + startX,
+        top: (d.y - rect.top) * scale + startY,
+        width: w,
+        height: h,
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border.all(
+                color: on ? Colors.white : Colors.white38, width: 1.0),
+            color: on
+                ? (isCurrent ? Colors.white : Colors.white70)
+                : Colors.transparent,
+          ),
+          child: on
+              ? Center(
+                  child: Text('${j + 1}',
+                      style: TextStyle(
+                        color: isCurrent
+                            ? _ToolbarTheme.blueColor
+                            : _ToolbarTheme.inactiveColor,
+                        fontSize: (w < h ? w : h) * 0.7,
+                        fontWeight: FontWeight.bold,
+                      )))
+              : null,
+        ),
+      ));
+    }
+    width.value = rect.width * scale + startX * 2;
+    return Stack(alignment: Alignment.center, children: [
+      SizedBox(height: _ToolbarTheme.buttonSize),
+      SizedBox(
+          width: width.value,
+          height: height + startY * 2,
+          child: Stack(children: children)),
+    ]);
   }
 
   globalMonitorsWidget(
@@ -2580,6 +2651,13 @@ class _KeyboardMenu extends StatelessWidget {
         color: _ToolbarTheme.blueColor,
         hoverColor: _ToolbarTheme.hoverBlueColor,
         menuChildrenGetter: (_) => [
+              // HX: Windows han/yeong key (Mac Caps Lock also sends it)
+              if (pi.platform == kPeerPlatformWindows)
+                MenuButton(
+                    ffi: ffi,
+                    onPressed: () => ffi.inputModel.hxSendHangul(),
+                    child: Text('한/영 전환 (원격 PC)')),
+              if (pi.platform == kPeerPlatformWindows) Divider(),
               keyboardMode(),
               localKeyboardType(),
               inputSource(),

@@ -755,6 +755,7 @@ class InputModel {
       return KeyEventResult.handled;
     }
     if (isViewCamera) return KeyEventResult.handled;
+    if (_hxCapsLockToHangul(e.physicalKey)) return KeyEventResult.handled;
     if (!isInputSourceFlutter) {
       if (isDesktop) {
         return KeyEventResult.handled;
@@ -851,6 +852,7 @@ class InputModel {
       return KeyEventResult.handled;
     }
     if (isViewCamera) return KeyEventResult.handled;
+    if (_hxCapsLockToHangul(e.physicalKey)) return KeyEventResult.handled;
     if (!isInputSourceFlutter) {
       if (isDesktop) {
         return KeyEventResult.handled;
@@ -1335,6 +1337,25 @@ class InputModel {
         e.logicalKey.keyLabel;
     inputKey(label, down: down, press: press ?? false);
   }
+
+  // HX: on a Korean Mac, Caps Lock is the Korean/English (han/yeong) key. When the
+  // peer is Windows, send the Windows han/yeong key (VK_HANGUL) instead of Caps Lock,
+  // so the remote input language switches. Flutter may report one tap as a
+  // down/up pair, hence the short debounce.
+  int _hxLastHangulMs = 0;
+  bool _hxCapsLockToHangul(PhysicalKeyboardKey key) {
+    if (!isMacOS || peerPlatform != kPeerPlatformWindows) return false;
+    if (key != PhysicalKeyboardKey.capsLock) return false;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _hxLastHangulMs > 250) {
+      _hxLastHangulMs = now;
+      hxSendHangul();
+    }
+    return true;
+  }
+
+  /// HX: press the Windows han/yeong key on the remote PC.
+  void hxSendHangul() => inputKey('VK_HANGUL', press: true);
 
   /// Send key stroke event.
   /// [down] indicates the key's state(down or up).
