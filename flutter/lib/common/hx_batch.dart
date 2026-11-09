@@ -84,7 +84,8 @@ String _result(String clean) {
       (lines.last.trim().isEmpty || RegExp(r'^PS .*>\s*$').hasMatch(lines.last.trim()))) {
     lines.removeLast();
   }
-  var out = lines.join('\n').trim();
+  // PowerShell redraws can leave long runs of empty lines; keep at most one
+  var out = lines.join('\n').replaceAll(RegExp(r'\n\s*\n(\s*\n)+'), '\n\n').trim();
   if (out.length > 20000) out = '...\n${out.substring(out.length - 20000)}';
   return out;
 }
