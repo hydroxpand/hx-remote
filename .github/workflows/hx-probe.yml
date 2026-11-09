@@ -1,0 +1,15 @@
+name: HX runner probe
+# HX: check which macOS arm64 runner label gets a machine quickly (macos-15 arm64 had capacity limits)
+on:
+  workflow_dispatch:
+    inputs:
+      os:
+        description: "runner label"
+        required: true
+        default: "macos-26"
+jobs:
+  probe:
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: 5
+    steps:
+      - run: uname -m; sw_vers; sysctl -n hw.ncpu
