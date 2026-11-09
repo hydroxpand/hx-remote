@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 
 import '../../common.dart';
 import '../hx_thumbs.dart';
+import '../hx_peer_tools.dart';
 import '../../common/formatter/id_formatter.dart';
 import '../../models/peer_model.dart';
 import '../../models/platform_model.dart';
@@ -417,6 +418,8 @@ class _PeerCardState extends State<_PeerCard>
           : '',
       child: Stack(children: [
         child,
+        // HX: disk / memory badge from the last status check
+        Positioned(top: 4, right: 10, child: HxStatusBadge(id: peer.id)),
         if (_shouldBuildPasswordIcon(peer))
           Positioned(
             top: 4,

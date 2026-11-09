@@ -5,6 +5,7 @@
 # and when that is newer than C:\ProgramData\HX-Remote\build.txt and nobody is connected right now,
 # downloads the Windows exe, checks its SHA-256 against SHA256SUMS and reinstalls silently.
 # Settings, ID and password survive a reinstall. Log: C:\ProgramData\HX-Remote\update.log
+# It also deletes session recordings (C:\ProgramData\HX-Remote\recording) older than 30 days.
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 $repo = "hydroxpand/hx-remote"
@@ -18,6 +19,21 @@ function TagVer($t) {
   if ($t -match '^hx-(\d+)\.(\d+)\.(\d+)-(\d+)$') { return [version]("{0}.{1}.{2}.{3}" -f $Matches[1], $Matches[2], $Matches[3], $Matches[4]) }
   return $null
 }
+# Housekeeping first (runs even when there is no update): session recordings are kept 30 days,
+# 7 days when C: has less than 20 GB free.
+try {
+  $rec = Join-Path $dataDir "recording"
+  if (Test-Path $rec) {
+    $freeGB = [int]((Get-PSDrive C).Free / 1GB)
+    $days = if ($freeGB -lt 20) { 7 } else { 30 }
+    $old = Get-ChildItem $rec -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-$days) }
+    if ($old) {
+      $mb = [int](($old | Measure-Object Length -Sum).Sum / 1MB)
+      $old | Remove-Item -Force -ErrorAction SilentlyContinue
+      L ("removed " + @($old).Count + " recordings older than " + $days + " days (" + $mb + " MB)")
+    }
+  }
+} catch { L ("recording cleanup error: " + $_.Exception.Message) }
 try {
   if ((Test-Path $log) -and ((Get-Item $log).Length -gt 200KB)) { Remove-Item $log -Force }
   [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12

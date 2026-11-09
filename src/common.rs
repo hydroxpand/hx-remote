@@ -2526,6 +2526,14 @@ pub fn apply_hx_defaults() {
         .write()
         .unwrap()
         .insert("allow-auto-update".to_owned(), "N".to_owned());
+    // Record every incoming session on Windows PCs (CEO request 261109): who did what on a
+    // lab PC. Files go to C:\ProgramData\HX-Remote\recording; tools/hxupdate.ps1 deletes
+    // recordings older than 30 days. Locked so it cannot be switched off at the PC.
+    #[cfg(windows)]
+    config::OVERWRITE_SETTINGS
+        .write()
+        .unwrap()
+        .insert("allow-auto-record-incoming".to_owned(), "Y".to_owned());
     config::OVERWRITE_LOCAL_SETTINGS
         .write()
         .unwrap()

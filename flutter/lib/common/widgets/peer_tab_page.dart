@@ -25,6 +25,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../common.dart';
 import '../hx_batch.dart';
+import '../hx_peer_tools.dart';
 import '../../models/platform_model.dart';
 
 class PeerTabPage extends StatefulWidget {
@@ -367,6 +368,7 @@ class _PeerTabPageState extends State<PeerTabPage>
           child: Row(
             children: [
               hxOpenAsGridSelection(),
+              hxSaveGroupSelection(),
               hxBatchCommandSelection(),
               deleteSelection(),
               addSelectionToFav(),
@@ -399,6 +401,21 @@ class _PeerTabPageState extends State<PeerTabPage>
           hxOpenPeersAsGrid(ids);
         },
         child: const Icon(Icons.grid_view));
+  }
+
+  // HX: save the selected PCs as a named group (common/hx_peer_tools.dart)
+  Widget hxSaveGroupSelection() {
+    final model = Provider.of<PeerTabModel>(context);
+    if (!(isDesktop || isWebDesktop) || isWeb) return Offstage();
+    return _hoverAction(
+        context: context,
+        toolTip: '묶음으로 저장',
+        onTap: () {
+          final ids = model.selectedPeers.map((e) => e.id).toList();
+          model.setMultiSelectionMode(false);
+          hxSaveGroupDialog(ids);
+        },
+        child: const Icon(Icons.bookmark_add_outlined));
   }
 
   // HX: send one command to all selected PCs (common/hx_batch.dart)
@@ -609,6 +626,10 @@ class _PeerTabPageState extends State<PeerTabPage>
     final model = Provider.of<PeerTabModel>(context);
     return [
       const PeerSearchBar().marginOnly(right: 13),
+      // HX: saved PC groups and the status check
+      if (isDesktop) const HxGroupsButton(),
+      if (isDesktop)
+        HxStatusButton(peers: () => model.currentTabCachedPeers.toList()),
       _createRefresh(
           index: PeerTabIndex.ab, loading: gFFI.abModel.currentAbLoading),
       _createRefresh(
