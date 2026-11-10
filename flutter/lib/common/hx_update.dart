@@ -208,7 +208,7 @@ class _HxUpdatePanelState extends State<HxUpdatePanel> {
             : latest == null
                 ? '받을 수 있는 버전: -'
                 : upToDate
-                    ? '받을 수 있는 버전: ${latest.tag} (최신 버전이에요)'
+                    ? '받을 수 있는 버전: ${iv != null && _cmp(iv, latest.ver) > 0 ? _installed : latest.tag} (최신 버전이에요)'
                     : '받을 수 있는 버전: ${latest.tag}'),
         if (_error != null) Text(_error!, style: hint),
         if (!upToDate && newer.isNotEmpty) ...[
