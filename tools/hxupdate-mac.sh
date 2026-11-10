@@ -17,6 +17,8 @@ DIR="$HOME/Library/Application Support/HX-Remote-Updater"
 MARK="$DIR/build.txt"          # "<tag> <arch>" of the installed build
 LOG="$DIR/update.log"
 mkdir -p "$DIR"
+# "update now" button in the app drops this flag: skip the idle wait
+if [ -f "$DIR/force" ]; then rm -f "$DIR/force"; HX_FORCE=1; fi
 log() { echo "$(date '+%Y-%m-%dT%H:%M:%S')  $*" >> "$LOG"; [ -n "${HX_VERBOSE:-}${HX_DRY:-}${HX_FORCE:-}" ] && echo "$*"; }
 [ -f "$LOG" ] && [ "$(stat -f%z "$LOG")" -gt 200000 ] && rm -f "$LOG"
 

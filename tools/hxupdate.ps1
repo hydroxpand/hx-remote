@@ -55,8 +55,12 @@ try {
   $curV = TagVer $cur
   if ($curV -and ($bestV -le $curV)) { exit 0 }   # up to date; no log line, keeps the log small
   # never pull the rug from under a live session (--cm is the connection manager of a session)
+  # "update now" button in the app drops this flag: do not wait for the session to end
+  $forceFile = Join-Path $dataDir "force-update"
+  $force = Test-Path $forceFile
+  if ($force) { Remove-Item $forceFile -Force -ErrorAction SilentlyContinue }
   $busy = Get-CimInstance Win32_Process -Filter "Name='HX-Remote.exe'" | Where-Object { $_.CommandLine -like "*--cm*" }
-  if ($busy) { L ("update " + $cur + " -> " + $best.tag + " postponed: session in progress"); exit 0 }
+  if ($busy -and -not $force) { L ("update " + $cur + " -> " + $best.tag + " postponed: session in progress"); exit 0 }
   $f = Join-Path $env:TEMP "hx-remote-update.exe"
   Invoke-WebRequest -Uri $best.exe.browser_download_url -OutFile $f -UseBasicParsing -Headers $h
   $sf = Join-Path $env:TEMP "hx-remote-SHA256SUMS"

@@ -99,6 +99,14 @@ if (-not $noupdater) {
     $set = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
     $pr = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
     Register-ScheduledTask -TaskName "HX Remote Update" -Description "HX Remote auto-update from github.com/hydroxpand/hx-remote (HydroXpand)" -Action $act -Trigger $trg -Settings $set -Principal $pr -Force | Out-Null
+    # let signed-in users start the task (the "update now" button in the app); the script itself
+    # lives in Program Files and cannot be changed by them
+    try {
+      $sch = New-Object -ComObject Schedule.Service; $sch.Connect()
+      $tk = $sch.GetFolder("\").GetTask("HX Remote Update")
+      $sd = $tk.GetSecurityDescriptor(4)
+      if ($sd -notmatch "GRGX;;;AU") { $tk.SetSecurityDescriptor($sd + "(A;;GRGX;;;AU)", 0) }
+    } catch { Write-Host ("task permission: " + $_.Exception.Message) -ForegroundColor Yellow }
     Write-Host "auto-update task: on (daily 03:30, log C:\ProgramData\HX-Remote\update.log)"
   } catch { Write-Host ("auto-update task failed: " + $_.Exception.Message) -ForegroundColor Yellow }
 }
