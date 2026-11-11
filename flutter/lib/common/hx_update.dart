@@ -157,6 +157,7 @@ class _HxUpdatePanelState extends State<HxUpdatePanel> {
   String? _message;
   bool _checking = false;
   bool _starting = false;
+  bool _loaded = false; // first check finished (until then show "확인 중")
 
   @override
   void initState() {
@@ -183,6 +184,7 @@ class _HxUpdatePanelState extends State<HxUpdatePanel> {
       _releases = rels;
       _error = err;
       _checking = false;
+      _loaded = true;
     });
   }
 
@@ -201,7 +203,7 @@ class _HxUpdatePanelState extends State<HxUpdatePanel> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 8),
-        Text('설치된 버전: ${_installed ?? "알 수 없음 (자동 업데이트 장치가 아직 없어요)"}'),
+        Text('설치된 버전: ${!_loaded ? "확인 중..." : _installed ?? "알 수 없음 (자동 업데이트 장치가 아직 없어요)"}'),
         const SizedBox(height: 4),
         Text(_checking
             ? '받을 수 있는 버전: 확인 중...'
@@ -360,11 +362,15 @@ class _HxHomeUpdateCardState extends State<HxHomeUpdateCard> {
             Icon(Icons.check_circle_outline,
                 size: 13, color: Theme.of(context).hintColor),
             const SizedBox(width: 4),
-            Text(
-                _installed == null
-                    ? 'HX Remote 버전 정보 없음'
-                    : 'HX Remote ${_installed!}${_latest == null ? '' : ', 최신 버전'}',
-                style: hint),
+            // the left pane is narrow: keep it short and let it wrap
+            Flexible(
+              child: Text(
+                  _installed == null
+                      ? 'HX Remote 버전 정보 없음'
+                      : '${_installed!}${_latest == null ? '' : ' 최신'}',
+                  softWrap: true,
+                  style: hint),
+            ),
           ]),
         ),
       );
@@ -399,7 +405,11 @@ class _HxHomeUpdateCardState extends State<HxHomeUpdateCard> {
               Text('추가: $summary', style: const TextStyle(fontSize: 12)),
             ],
             const SizedBox(height: 8),
-            Row(children: [
+            Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                     visualDensity: VisualDensity.compact,
@@ -423,7 +433,6 @@ class _HxHomeUpdateCardState extends State<HxHomeUpdateCard> {
                 child: Text(_starting ? '시작하는 중...' : '지금 업데이트',
                     style: const TextStyle(fontSize: 12)),
               ),
-              const SizedBox(width: 6),
               TextButton(
                 onPressed: widget.onDetails,
                 child: const Text('자세히', style: TextStyle(fontSize: 12)),
