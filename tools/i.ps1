@@ -12,7 +12,7 @@
 # The person signs in once with the company e-mail; no key is stored in this public script.
 param([string]$pw = "", [string]$tag = "", [switch]$noupdater, [switch]$warp)
 # Cloudflare Zero Trust team name (set when the company Zero Trust org is ready)
-$WarpOrg = ""
+$WarpOrg = "purple-pond-45f0"
 $ErrorActionPreference = "Continue"
 $ProgressPreference = "SilentlyContinue"   # PS5 progress bar makes Invoke-WebRequest very slow
 $me = $MyInvocation.MyCommand.Path

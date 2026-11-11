@@ -12,7 +12,7 @@
 set -u
 REF="${HX_REF:-hx}"
 # Cloudflare Zero Trust team name (set when the company Zero Trust org is ready)
-WARP_ORG=""
+WARP_ORG="purple-pond-45f0"
 WARP=0
 for arg in "$@"; do [ "$arg" = "--warp" ] && WARP=1; done
 DIR="$HOME/Library/Application Support/HX-Remote-Updater"
