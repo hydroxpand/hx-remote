@@ -281,3 +281,158 @@ class _HxUpdatePanelState extends State<HxUpdatePanel> {
     );
   }
 }
+
+/// Home screen (left pane): one quiet line when up to date, a highlighted card with
+/// the new build, its first notes and the update button when a newer build exists.
+class HxHomeUpdateCard extends StatefulWidget {
+  final VoidCallback? onDetails;
+  const HxHomeUpdateCard({Key? key, this.onDetails}) : super(key: key);
+
+  @override
+  State<HxHomeUpdateCard> createState() => _HxHomeUpdateCardState();
+}
+
+class _HxHomeUpdateCardState extends State<HxHomeUpdateCard> {
+  String? _installed;
+  List<HxRelease> _newer = [];
+  HxRelease? _latest;
+  String? _message;
+  bool _starting = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+    _timer = Timer.periodic(const Duration(hours: 6), (_) => _check());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _check() async {
+    final installed = await hxInstalledBuild();
+    List<HxRelease> rels = [];
+    try {
+      rels = await hxFetchReleases();
+    } catch (_) {}
+    if (!mounted) return;
+    final iv = installed == null ? null : _ver(installed);
+    setState(() {
+      _installed = installed;
+      _latest = rels.isEmpty ? null : rels.first;
+      _newer = iv == null
+          ? []
+          : rels.where((r) => _cmp(r.ver, iv) > 0).toList();
+    });
+  }
+
+  String _summary() {
+    final lines = <String>[];
+    for (final r in _newer) {
+      for (final l in r.notes.split('\n')) {
+        final t = l.trim().replaceFirst(RegExp(r'^[-*•]\s*'), '');
+        if (t.isNotEmpty) lines.add(t);
+      }
+    }
+    if (lines.isEmpty) return '';
+    final firstTwo = lines.take(2).map((l) {
+      final cut = l.indexOf(':');
+      return cut > 0 && cut < 30 ? l.substring(0, cut) : (l.length > 40 ? '${l.substring(0, 40)}…' : l);
+    }).join(', ');
+    return lines.length > 2 ? '$firstTwo 외 ${lines.length - 2}가지' : firstTwo;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const pad = EdgeInsets.only(left: 20, right: 16, top: 4, bottom: 8);
+    final hint = TextStyle(fontSize: 11, color: Theme.of(context).hintColor);
+    if (_installed == null && _latest == null) return const SizedBox.shrink();
+    if (_newer.isEmpty) {
+      return Padding(
+        padding: pad,
+        child: InkWell(
+          onTap: widget.onDetails,
+          child: Row(children: [
+            Icon(Icons.check_circle_outline,
+                size: 13, color: Theme.of(context).hintColor),
+            const SizedBox(width: 4),
+            Text(
+                _installed == null
+                    ? 'HX Remote 버전 정보 없음'
+                    : 'HX Remote ${_installed!}${_latest == null ? '' : ', 최신 버전'}',
+                style: hint),
+          ]),
+        ),
+      );
+    }
+    final accent = Theme.of(context).colorScheme.primary;
+    final summary = _summary();
+    return Padding(
+      padding: pad,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: accent.withOpacity(0.12),
+          border: Border.all(color: accent.withOpacity(0.6)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(Icons.system_update_alt, size: 16, color: accent),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text('새 버전 ${_newer.first.tag}',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, color: accent, fontSize: 13)),
+              ),
+            ]),
+            const SizedBox(height: 2),
+            Text('지금 ${_installed!}', style: hint),
+            if (summary.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text('추가: $summary', style: const TextStyle(fontSize: 12)),
+            ],
+            const SizedBox(height: 8),
+            Row(children: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 12)),
+                onPressed: _starting
+                    ? null
+                    : () async {
+                        setState(() => _starting = true);
+                        String msg;
+                        try {
+                          msg = await hxStartUpdate();
+                        } catch (e) {
+                          msg = '업데이트를 시작하지 못했어요 ($e)';
+                        }
+                        if (!mounted) return;
+                        setState(() {
+                          _starting = false;
+                          _message = msg;
+                        });
+                      },
+                child: Text(_starting ? '시작하는 중...' : '지금 업데이트',
+                    style: const TextStyle(fontSize: 12)),
+              ),
+              const SizedBox(width: 6),
+              TextButton(
+                onPressed: widget.onDetails,
+                child: const Text('자세히', style: TextStyle(fontSize: 12)),
+              ),
+            ]),
+            if (_message != null) Text(_message!, style: hint),
+          ],
+        ),
+      ),
+    );
+  }
+}
