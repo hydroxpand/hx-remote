@@ -2492,11 +2492,9 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
     ThrottledInterval::new(i)
 }
 
-/// HX Remote: app name only. The ID/relay server and key are NOT built in, so a fresh
-/// install uses the public RustDesk servers (works anywhere, like AnyDesk). To move to our
-/// own server later, set custom-rendezvous-server / relay-server / key in Settings or with
-/// `--option` (see hxremote.ps1). Built-in defaults here would block that switch, because
-/// an empty option falls back to the default.
+/// HX Remote defaults. Since 261111 the ID/relay server is our company server (hbbs, hbbr on
+/// 172.30.1.34, set up by Jaehyung). PCs in the office reach it directly; PCs outside reach it
+/// through Cloudflare WARP (Zero Trust private network, no open ports at the office).
 pub fn apply_hx_defaults() {
     const HX_APP_NAME: &str = "HX-Remote"; // installer rejects spaces (validate_install_app_name)
     *config::APP_NAME.write().unwrap() = HX_APP_NAME.to_owned();
@@ -2521,6 +2519,15 @@ pub fn apply_hx_defaults() {
         b.insert(k.to_owned(), "Y".to_owned());
     }
     drop(b);
+    // Our ID/relay server and its public key, locked (relay defaults to the same host :21117).
+    {
+        let mut o = config::OVERWRITE_SETTINGS.write().unwrap();
+        o.insert("custom-rendezvous-server".to_owned(), "172.30.1.34".to_owned());
+        o.insert(
+            "key".to_owned(),
+            "ABuiNiIojpQ534We4SQfM1sW4laAXW8fBEfR7U+IrEU=".to_owned(),
+        );
+    }
     // The built-in updater only knows official RustDesk releases; it would replace HX Remote.
     config::OVERWRITE_SETTINGS
         .write()
