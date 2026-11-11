@@ -10,7 +10,7 @@
 # keeps the previous app as RustDesk.app.prev, and relaunches the app if it was running.
 # The app lives in ~/Applications/HX Remote.app (the Dock shows the file name); installs made
 # before 261111 used RustDesk.app and are renamed once, when nobody is using the Mac.
-# After an update it also refreshes this script from the same release tag.
+# After an update it also refreshes this script from the hx branch.
 #   HX_FORCE=1  ignore the idle check (used by the installer)
 #   HX_DRY=1    pick, download and verify, but do not replace anything
 set -u
@@ -132,8 +132,8 @@ echo "$TAG $ARCH" > "$MARK"
 [ "$RUNNING" = 1 ] && open "$APP"
 start_tray
 log "done $TAG $ARCH"
-# refresh this script from the same release (a new file, so the running copy is not disturbed)
-if curl -fsSL "https://raw.githubusercontent.com/$REPO/$TAG/tools/hxupdate-mac.sh" -o "$DIR/.hxupdate-mac.new" \
+# refresh this script from the hx branch (a new file, so the running copy is not disturbed)
+if curl -fsSL "https://raw.githubusercontent.com/$REPO/hx/tools/hxupdate-mac.sh" -o "$DIR/.hxupdate-mac.new" \
    && /bin/bash -n "$DIR/.hxupdate-mac.new"; then
   chmod 755 "$DIR/.hxupdate-mac.new" && mv -f "$DIR/.hxupdate-mac.new" "$DIR/hxupdate-mac.sh"
 else

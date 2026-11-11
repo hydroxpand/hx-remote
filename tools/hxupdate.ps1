@@ -83,11 +83,11 @@ try {
   }
   if ($ok) {
     Set-Content -Path $mark -Value $best.tag -Encoding ASCII; L ("done " + $best.tag)
-    # refresh this script from the same release; PowerShell has already read the running copy
+    # refresh this script from the hx branch; PowerShell has already read the running copy
     try {
       $me = $PSCommandPath
       $nf = $me + ".new"
-      Invoke-WebRequest -Uri ("https://raw.githubusercontent.com/$repo/" + $best.tag + "/tools/hxupdate.ps1") -OutFile $nf -UseBasicParsing -Headers $h
+      Invoke-WebRequest -Uri "https://raw.githubusercontent.com/$repo/hx/tools/hxupdate.ps1" -OutFile $nf -UseBasicParsing -Headers $h
       $perr = $null
       [void][System.Management.Automation.Language.Parser]::ParseFile($nf, [ref]$null, [ref]$perr)
       if (-not $perr -or $perr.Count -eq 0) { Move-Item -Force $nf $me } else { Remove-Item $nf -Force; L "new updater script did not parse, kept the old one" }
