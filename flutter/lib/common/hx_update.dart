@@ -421,8 +421,9 @@ class _HxHomeUpdateCardState extends State<HxHomeUpdateCard> {
             Row(children: [
               Icon(Icons.system_update_alt, size: 15, color: hasNew ? accent : theme.hintColor),
               const SizedBox(width: 6),
+              // short title: the 200 px pane wraps "HX Remote 업데이트"
               const Flexible(
-                  child: Text('HX Remote 업데이트',
+                  child: Text('앱 업데이트',
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold))),
             ]),
             const SizedBox(height: 6),
