@@ -7,7 +7,12 @@
 # survive an update. Updating from inside an HX Remote session drops that session for a minute.
 # Auto-update: scheduled task "HX Remote Update" runs C:\Program Files\HX-Remote-Updater\hxupdate.ps1
 # as SYSTEM (daily 03:30 and after startup). Pass -noupdater to skip it.
-param([string]$pw = "", [string]$tag = "", [switch]$noupdater)
+# -warp: also install Cloudflare WARP (only for PCs used outside the office: laptops, home PCs).
+# WARP lets them reach the HX Remote server inside the company network without opening ports.
+# The person signs in once with the company e-mail; no key is stored in this public script.
+param([string]$pw = "", [string]$tag = "", [switch]$noupdater, [switch]$warp)
+# Cloudflare Zero Trust team name (set when the company Zero Trust org is ready)
+$WarpOrg = ""
 $ErrorActionPreference = "Continue"
 $ProgressPreference = "SilentlyContinue"   # PS5 progress bar makes Invoke-WebRequest very slow
 $me = $MyInvocation.MyCommand.Path
@@ -16,6 +21,7 @@ if (-not $isAdmin) {
   $ps = Join-Path $PSHOME "powershell.exe"   # full path: some PCs have WindowsPowerShell missing from PATH
   $a = "-ep bypass -f `"$me`" `"$pw`" `"$tag`""
   if ($noupdater) { $a += " -noupdater" }
+  if ($warp) { $a += " -warp" }
   Start-Process $ps -Verb RunAs -ArgumentList $a
   exit
 }
@@ -109,6 +115,31 @@ if (-not $noupdater) {
     } catch { Write-Host ("task permission: " + $_.Exception.Message) -ForegroundColor Yellow }
     Write-Host "auto-update task: on (daily 03:30, log C:\ProgramData\HX-Remote\update.log)"
   } catch { Write-Host ("auto-update task failed: " + $_.Exception.Message) -ForegroundColor Yellow }
+}
+# Cloudflare WARP (optional): official installer, signature checked, organization preset
+if ($warp) {
+  try {
+    $wcli = "C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe"
+    if (-not $WarpOrg) {
+      Write-Host "WARP: company setup not ready yet, skipped (run this installer again later)" -ForegroundColor Yellow
+    } elseif (Test-Path $wcli) {
+      Write-Host "WARP: already installed"
+    } else {
+      Write-Host "WARP: downloading Cloudflare WARP ..."
+      $wf = Join-Path $env:TEMP "Cloudflare_WARP.msi"
+      Invoke-WebRequest -Uri "https://downloads.cloudflareclient.com/v1/download/windows/ga" -OutFile $wf -UseBasicParsing -Headers $h
+      $sig = Get-AuthenticodeSignature $wf
+      if ($sig.Status -ne "Valid" -or $sig.SignerCertificate.Subject -notlike "*Cloudflare*") {
+        Write-Host ("WARP: signature check failed (" + $sig.Status + "), not installing") -ForegroundColor Red
+      } else {
+        Write-Host "WARP: installing ..."
+        $p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList ("/i `"" + $wf + "`" /qn ORGANIZATION=`"" + $WarpOrg + "`"")
+        if ($p.ExitCode -eq 0) { Write-Host "WARP: installed. Open Cloudflare WARP and sign in with your company e-mail once." -ForegroundColor Green }
+        else { Write-Host ("WARP: installer exit code " + $p.ExitCode) -ForegroundColor Yellow }
+      }
+      Remove-Item $wf -Force -ErrorAction SilentlyContinue
+    }
+  } catch { Write-Host ("WARP: " + $_.Exception.Message) -ForegroundColor Yellow }
 }
 $idf = Join-Path $env:TEMP "hxremote_id.txt"
 cmd /c "`"$app`" --get-id > `"$idf`" 2>&1"
