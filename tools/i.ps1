@@ -91,13 +91,13 @@ if (-not (Test-Path $app)) { Write-Host "INSTALL FAILED" -ForegroundColor Red; R
 $svc = Get-Service -Name "HX-Remote" -ErrorAction SilentlyContinue
 Write-Host ("service: " + $(if ($svc) { $svc.Status } else { "none" }))
 if ($pw) { & $app --password $pw | Out-Null; Start-Sleep -Seconds 2; Write-Host "password set" }
-# auto-update task (script from the same release tag; Program Files is not writable by normal users)
+# auto-update task (script from the hx branch; Program Files is not writable by normal users)
 if (-not $noupdater) {
   try {
     $ud = "C:\Program Files\HX-Remote-Updater"
     New-Item -ItemType Directory -Force -Path $ud | Out-Null
     $us = Join-Path $ud "hxupdate.ps1"
-    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/$repo/$tag/tools/hxupdate.ps1" -OutFile $us -UseBasicParsing -Headers $h
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/$repo/hx/tools/hxupdate.ps1" -OutFile $us -UseBasicParsing -Headers $h
     $ps = Join-Path $PSHOME "powershell.exe"
     $act = New-ScheduledTaskAction -Execute $ps -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$us`""
     $trg = @((New-ScheduledTaskTrigger -Daily -At "03:30"), (New-ScheduledTaskTrigger -AtStartup))
