@@ -81,7 +81,18 @@ try {
     $s = Get-Service -Name "HX-Remote" -ErrorAction SilentlyContinue
     if ($okExe -and $s -and $s.Status -eq "Running") { $ok = $true; break }
   }
-  if ($ok) { Set-Content -Path $mark -Value $best.tag -Encoding ASCII; L ("done " + $best.tag) }
+  if ($ok) {
+    Set-Content -Path $mark -Value $best.tag -Encoding ASCII; L ("done " + $best.tag)
+    # refresh this script from the same release; PowerShell has already read the running copy
+    try {
+      $me = $PSCommandPath
+      $nf = $me + ".new"
+      Invoke-WebRequest -Uri ("https://raw.githubusercontent.com/$repo/" + $best.tag + "/tools/hxupdate.ps1") -OutFile $nf -UseBasicParsing -Headers $h
+      $perr = $null
+      [void][System.Management.Automation.Language.Parser]::ParseFile($nf, [ref]$null, [ref]$perr)
+      if (-not $perr -or $perr.Count -eq 0) { Move-Item -Force $nf $me } else { Remove-Item $nf -Force; L "new updater script did not parse, kept the old one" }
+    } catch { L ("updater script refresh: " + $_.Exception.Message) }
+  }
   else { L ("install of " + $best.tag + " did not finish in 4 minutes") }
 } catch {
   L ("error: " + $_.Exception.Message)

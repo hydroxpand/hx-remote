@@ -1,7 +1,7 @@
 #!/bin/bash
 # HX Remote installer for macOS (no admin rights needed). In Terminal:
 #   curl -fsSL https://raw.githubusercontent.com/hydroxpand/hx-remote/hx/tools/i-mac.sh | bash
-# Installs the newest HX Remote build to ~/Applications/RustDesk.app (shown as "HX Remote"),
+# Installs the newest HX Remote build to ~/Applications/HX Remote.app (RustDesk.app before 261111),
 # the menu bar icon (LaunchAgent com.hydroxpand.hxremote.tray) and the hourly auto-update
 # (LaunchAgent com.hydroxpand.hxremote.update, script tools/hxupdate-mac.sh).
 # Laptops used outside the office also need Cloudflare WARP to reach the company HX Remote server:
@@ -17,7 +17,7 @@ WARP=0
 for arg in "$@"; do [ "$arg" = "--warp" ] && WARP=1; done
 DIR="$HOME/Library/Application Support/HX-Remote-Updater"
 AG="$HOME/Library/LaunchAgents"
-APP="$HOME/Applications/RustDesk.app"
+APP="$HOME/Applications/HX Remote.app"
 UID_GUI="gui/$(id -u)"
 mkdir -p "$DIR" "$AG" "$HOME/Applications"
 
@@ -81,7 +81,7 @@ for L in update tray; do
   launchctl bootout "$UID_GUI/com.hydroxpand.hxremote.$L" 2>/dev/null
   launchctl bootstrap "$UID_GUI" "$AG/com.hydroxpand.hxremote.$L.plist"
 done
-pgrep -f "RustDesk.app/Contents/MacOS/RustDesk$" >/dev/null || open "$APP"
+pgrep -f 'Applications/(HX Remote|RustDesk)\.app/Contents/MacOS/RustDesk$' >/dev/null || open "$APP"
 
 # Cloudflare WARP (optional): official package, signature checked, organization preset
 if [ "$WARP" = 1 ]; then
