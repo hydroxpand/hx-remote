@@ -79,7 +79,11 @@ HX_FORCE=1 /bin/bash "$DIR/hxupdate-mac.sh"
 
 for L in update tray; do
   launchctl bootout "$UID_GUI/com.hydroxpand.hxremote.$L" 2>/dev/null
-  launchctl bootstrap "$UID_GUI" "$AG/com.hydroxpand.hxremote.$L.plist"
+  # bootout finishes in the background; bootstrap right after it can fail with "Input/output error"
+  for _ in 1 2 3 4 5; do
+    sleep 1
+    launchctl bootstrap "$UID_GUI" "$AG/com.hydroxpand.hxremote.$L.plist" 2>/dev/null && break
+  done
 done
 pgrep -f 'Applications/(HX Remote|RustDesk)\.app/Contents/MacOS/RustDesk$' >/dev/null || open "$APP"
 
