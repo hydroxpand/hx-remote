@@ -140,14 +140,18 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           children: [
             Column(
               children: [
-                SingleChildScrollView(
-                  controller: _leftPaneScrollController,
-                  child: Column(
-                    key: _childKey,
-                    children: children,
+                // HX: Flexible so the pane scrolls instead of overflowing
+                // when the update box makes it taller than the window
+                Flexible(
+                  child: SingleChildScrollView(
+                    controller: _leftPaneScrollController,
+                    child: Column(
+                      key: _childKey,
+                      children: children,
+                    ),
                   ),
                 ),
-                Expanded(child: Container())
+                // (no Expanded filler: it would cap the scroll view at half height)
               ],
             ),
             if (isOutgoingOnly)

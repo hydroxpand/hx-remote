@@ -284,8 +284,9 @@ class _HxUpdatePanelState extends State<HxUpdatePanel> {
   }
 }
 
-/// Home screen (left pane): one quiet line when up to date, a highlighted card with
-/// the new build, its first notes and the update button when a newer build exists.
+/// Home screen (left pane): always-visible box with the installed build, the newest
+/// build, up-to-date or "new version" status, a short what's-new line and the buttons
+/// (update now when newer, check, details). Highlighted when a newer build exists.
 class HxHomeUpdateCard extends StatefulWidget {
   final VoidCallback? onDetails;
   const HxHomeUpdateCard({Key? key, this.onDetails}) : super(key: key);
@@ -300,6 +301,9 @@ class _HxHomeUpdateCardState extends State<HxHomeUpdateCard> {
   HxRelease? _latest;
   String? _message;
   bool _starting = false;
+  bool _checking = false;
+  bool _failed = false; // could not reach GitHub
+  DateTime? _checkedAt;
   Timer? _timer;
 
   @override
@@ -316,19 +320,26 @@ class _HxHomeUpdateCardState extends State<HxHomeUpdateCard> {
   }
 
   Future<void> _check() async {
+    if (mounted) setState(() => _checking = true);
     final installed = await hxInstalledBuild();
     List<HxRelease> rels = [];
+    var failed = false;
     try {
       rels = await hxFetchReleases();
-    } catch (_) {}
+    } catch (_) {
+      failed = true;
+    }
     if (!mounted) return;
     final iv = installed == null ? null : _ver(installed);
     setState(() {
       _installed = installed;
       _latest = rels.isEmpty ? null : rels.first;
-      _newer = iv == null
-          ? []
-          : rels.where((r) => _cmp(r.ver, iv) > 0).toList();
+      // without a known installed build every release counts as "new":
+      // the button then installs the auto-update job as well
+      _newer = rels.where((r) => iv == null || _cmp(r.ver, iv) > 0).toList();
+      _failed = failed;
+      _checking = false;
+      _checkedAt = DateTime.now();
     });
   }
 
@@ -348,97 +359,138 @@ class _HxHomeUpdateCardState extends State<HxHomeUpdateCard> {
     return lines.length > 2 ? '$firstTwo 외 ${lines.length - 2}가지' : firstTwo;
   }
 
+  String _two(int n) => n.toString().padLeft(2, '0');
+
   @override
   Widget build(BuildContext context) {
-    const pad = EdgeInsets.only(left: 20, right: 16, top: 4, bottom: 8);
-    final hint = TextStyle(fontSize: 11, color: Theme.of(context).hintColor);
-    if (_installed == null && _latest == null) return const SizedBox.shrink();
-    if (_newer.isEmpty) {
-      return Padding(
-        padding: pad,
-        child: InkWell(
-          onTap: widget.onDetails,
-          child: Row(children: [
-            Icon(Icons.check_circle_outline,
-                size: 13, color: Theme.of(context).hintColor),
-            const SizedBox(width: 4),
-            // the left pane is narrow: keep it short and let it wrap
-            Flexible(
-              child: Text(
-                  _installed == null
-                      ? 'HX Remote 버전 정보 없음'
-                      : '${_installed!}${_latest == null ? '' : ' 최신'}',
-                  softWrap: true,
-                  style: hint),
-            ),
-          ]),
-        ),
-      );
+    final theme = Theme.of(context);
+    final accent = theme.colorScheme.primary;
+    const ok = Color(0xFF2E9E5B);
+    final hint = TextStyle(fontSize: 11, color: theme.hintColor);
+    const body = TextStyle(fontSize: 12);
+    final hasNew = _newer.isNotEmpty;
+
+    // status line: checking / failed / new version / up to date
+    Widget status;
+    if (_checking && _checkedAt == null) {
+      status = Text('확인 중...', style: hint);
+    } else if (hasNew) {
+      status = Row(children: [
+        Icon(Icons.fiber_new, size: 15, color: accent),
+        const SizedBox(width: 4),
+        Flexible(
+            child: Text('새 버전이 있어요',
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.bold, color: accent))),
+      ]);
+    } else if (_failed) {
+      status = Row(children: [
+        Icon(Icons.cloud_off, size: 14, color: theme.hintColor),
+        const SizedBox(width: 4),
+        Flexible(child: Text('서버 확인 못 함 (인터넷 확인)', style: hint)),
+      ]);
+    } else {
+      status = const Row(children: [
+        Icon(Icons.check_circle, size: 14, color: ok),
+        SizedBox(width: 4),
+        Flexible(
+            child: Text('최신 버전이에요',
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.bold, color: ok))),
+      ]);
     }
-    final accent = Theme.of(context).colorScheme.primary;
-    final summary = _summary();
+    final summary = hasNew ? _summary() : '';
+    final btnStyle = ElevatedButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 12));
+
     return Padding(
-      padding: pad,
+      padding: const EdgeInsets.only(left: 20, right: 16, top: 4, bottom: 8),
       child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: accent.withOpacity(0.12),
-          border: Border.all(color: accent.withOpacity(0.6)),
+          color: hasNew ? accent.withOpacity(0.12) : theme.hintColor.withOpacity(0.06),
+          border: Border.all(
+              color: hasNew ? accent.withOpacity(0.6) : theme.hintColor.withOpacity(0.25)),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              Icon(Icons.system_update_alt, size: 16, color: accent),
+              Icon(Icons.system_update_alt, size: 15, color: hasNew ? accent : theme.hintColor),
               const SizedBox(width: 6),
-              Expanded(
-                child: Text('새 버전 ${_newer.first.tag}',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold, color: accent, fontSize: 13)),
-              ),
+              const Flexible(
+                  child: Text('HX Remote 업데이트',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold))),
             ]),
-            const SizedBox(height: 2),
-            Text('지금 ${_installed!}', style: hint),
+            const SizedBox(height: 6),
+            // the pane is 200 px wide: short labels
+            Text('설치됨  ${_installed ?? (_checkedAt == null ? "확인 중..." : "알 수 없음")}',
+                style: body),
+            Text('최신  ${_latest?.tag ?? (_checkedAt == null || _checking ? "확인 중..." : "-")}',
+                style: body),
+            const SizedBox(height: 4),
+            status,
             if (summary.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text('추가: $summary', style: const TextStyle(fontSize: 12)),
+              Text('추가: $summary', style: body),
             ],
             const SizedBox(height: 8),
             Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 12)),
-                onPressed: _starting
-                    ? null
-                    : () async {
-                        setState(() => _starting = true);
-                        String msg;
-                        try {
-                          msg = await hxStartUpdate();
-                        } catch (e) {
-                          msg = '업데이트를 시작하지 못했어요 ($e)';
-                        }
-                        if (!mounted) return;
-                        setState(() {
-                          _starting = false;
-                          _message = msg;
-                        });
-                      },
-                child: Text(_starting ? '시작하는 중...' : '지금 업데이트',
-                    style: const TextStyle(fontSize: 12)),
-              ),
-              TextButton(
-                onPressed: widget.onDetails,
-                child: const Text('자세히', style: TextStyle(fontSize: 12)),
-              ),
-            ]),
-            if (_message != null) Text(_message!, style: hint),
+              spacing: 6,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                if (hasNew)
+                  ElevatedButton(
+                    style: btnStyle,
+                    onPressed: _starting
+                        ? null
+                        : () async {
+                            setState(() => _starting = true);
+                            String msg;
+                            try {
+                              msg = await hxStartUpdate();
+                            } catch (e) {
+                              msg = '업데이트를 시작하지 못했어요 ($e)';
+                            }
+                            if (!mounted) return;
+                            setState(() {
+                              _starting = false;
+                              _message = msg;
+                            });
+                          },
+                    child: Text(_starting ? '시작하는 중...' : '지금 업데이트',
+                        style: const TextStyle(fontSize: 12)),
+                  ),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 10)),
+                  onPressed: _checking ? null : _check,
+                  child: Text(_checking ? '확인 중...' : '업데이트 확인',
+                      style: const TextStyle(fontSize: 12)),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 6)),
+                  onPressed: widget.onDetails,
+                  child: const Text('자세히', style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
+            if (_message != null) ...[
+              const SizedBox(height: 4),
+              Text(_message!, style: hint),
+            ],
+            if (_checkedAt != null) ...[
+              const SizedBox(height: 4),
+              Text('${_two(_checkedAt!.hour)}:${_two(_checkedAt!.minute)} 확인, 6시간마다 자동',
+                  style: hint),
+            ],
           ],
         ),
       ),
