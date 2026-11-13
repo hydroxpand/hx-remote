@@ -2294,6 +2294,11 @@ async fn key_exchange(conn: &mut Stream, key: &str, log_on_success: bool) -> Res
     let Some(rs_pk) = rs_pk else {
         bail!("Handshake failed: invalid public key from rendezvous server");
     };
+    if server_skips_key_exchange() {
+        // Answer at once as for a server from before the exchange instead of waiting
+        // READ_TIMEOUT for a KeyExchange that will never come.
+        return Ok(false);
+    }
     match timeout(READ_TIMEOUT, conn.next()).await? {
         Some(Ok(bytes)) => {
             if let Ok(msg_in) = RendezvousMessage::parse_from_bytes(&bytes) {
@@ -2356,6 +2361,26 @@ async fn key_exchange(conn: &mut Stream, key: &str, log_on_success: bool) -> Res
         _ => {}
     }
     Ok(false)
+}
+
+/// HydroXpand (261113): the free hbbs (rustdesk-server 1.1.x, which runs on our in-house server)
+/// never sends a KeyExchange; only the public and Pro servers do. A client that waits for one
+/// (a logged-in account, a WebRTC offer, the TCP mediator, the API proxy) sat out READ_TIMEOUT
+/// and then failed with "Failed to secure tcp: deadline has elapsed". So for a custom server
+/// other than *.rustdesk.com the exchange is skipped: `secure_tcp` goes on unencrypted as
+/// upstream does with a free hbbs (sessions stay end-to-end encrypted with the peer's key) and
+/// `secure_tcp_required` fails at once, so WebRTC degrades without the wait.
+/// Option `hx-key-exchange`: "Y" always waits for the exchange, "N" never does.
+fn server_skips_key_exchange() -> bool {
+    match Config::get_option("hx-key-exchange").as_str() {
+        "Y" => false,
+        "N" => true,
+        _ => {
+            let custom = Config::get_option("custom-rendezvous-server");
+            let host = custom.trim().to_lowercase();
+            !host.is_empty() && !host.contains("rustdesk.com")
+        }
+    }
 }
 
 pub async fn secure_tcp(conn: &mut Stream, key: &str) -> ResultType<()> {
