@@ -2563,10 +2563,10 @@ pub fn apply_hx_defaults() {
         .write()
         .unwrap()
         .insert("enable-check-update".to_owned(), "N".to_owned());
-    // Phones (HX Remote for Android / iOS, 261113): the network tab is hidden above, so the
-    // app comes with the company HX Remote server built in. Desktop builds stay without it
-    // and get the server from the installers (--option / settings file).
-    #[cfg(any(target_os = "android", target_os = "ios"))]
+    // Company HX Remote server built in on every platform (CEO decision 261113). The network
+    // tab is hidden above, and the public RustDesk servers now ask the connecting side to sign
+    // in. These are defaults: a value set with --option or in the settings file still wins.
+    // PCs that never got the server (empty options) switch to it with this build's auto-update.
     {
         const HX_SERVER: &str = "172.30.1.34";
         // public key of the company hbbs, not a secret
