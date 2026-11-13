@@ -684,6 +684,10 @@ pub async fn start_server(is_server: bool, no_server: bool) {
                     log::error!("ipc is occupied by another process, try kill it");
                     std::thread::spawn(stop_main_window_process).join().ok();
                 }
+                // not std::process::exit on Windows: see platform::windows::exit_now
+                #[cfg(windows)]
+                crate::platform::windows::exit_now(-1);
+                #[cfg(not(windows))]
                 std::process::exit(-1);
             }
         });

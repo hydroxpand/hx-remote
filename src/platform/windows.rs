@@ -4336,6 +4336,28 @@ pub fn try_kill_rustdesk_main_window_process() -> ResultType<()> {
     if app_name.is_empty() {
         bail!("app name is empty");
     }
+    // HX: kill the process that actually holds our ipc pipe when it is a copy of this app.
+    // The setup exe run without --silent-install unpacks itself to %LOCALAPPDATA%\rustdesk and
+    // runs "rustdesk.exe" (portable mode) with our app name: it takes the "HX-Remote" pipe although
+    // its exe is not "hx-remote.exe", so the name match below never found it and --server could not
+    // start ipc again until that window was closed (261113, three lab PCs).
+    if let Some(owner) = ipc_pipe_server_pid() {
+        if owner != my_pid {
+            if let Some(p) = sys.process((owner as usize).into()) {
+                let p_name = p.name().to_lowercase();
+                let ours = p_name == app_name
+                    || p_name == app_name.clone() + ".exe"
+                    || p_name == "rustdesk.exe";
+                if ours && p.user_id() != my_uid {
+                    log::info!("try kill ipc pipe owner: {:?}, pid = {:?}", p.exe(), owner);
+                    nt_terminate_process(owner)?;
+                    log::info!("kill ipc pipe owner success, pid = {:?}", owner);
+                    return Ok(());
+                }
+                log::info!("ipc pipe owner {:?} (pid {}) not killed", p_name, owner);
+            }
+        }
+    }
     for (_, p) in sys.processes().iter() {
         let p_name = p.name().to_lowercase();
         // name equal
@@ -4370,6 +4392,47 @@ pub fn try_kill_rustdesk_main_window_process() -> ResultType<()> {
         return Ok(());
     }
     bail!("failed to find rustdesk main window process");
+}
+
+/// Pid of the process serving our main ipc pipe (`\\.\pipe\<app>\query`), if any.
+fn ipc_pipe_server_pid() -> Option<u32> {
+    let path = wide_string(&hbb_common::config::Config::ipc_path(""));
+    unsafe {
+        let h = winapi::um::fileapi::CreateFileW(
+            path.as_ptr(),
+            winapi::um::winnt::FILE_READ_ATTRIBUTES,
+            winapi::um::winnt::FILE_SHARE_READ | winapi::um::winnt::FILE_SHARE_WRITE,
+            null_mut(),
+            winapi::um::fileapi::OPEN_EXISTING,
+            0,
+            null_mut(),
+        );
+        if h == INVALID_HANDLE_VALUE {
+            return None;
+        }
+        let mut pid: ULONG = 0;
+        let ok = GetNamedPipeServerProcessId(h, &mut pid);
+        CloseHandle(h);
+        if ok == FALSE || pid == 0 {
+            None
+        } else {
+            Some(pid)
+        }
+    }
+}
+
+/// End this process at once, without `std::process::exit`.
+///
+/// Rust's `exit` runs the runtime cleanup first, and on Windows that calls `WSACleanup`. If
+/// `ExitProcess` then blocks (seen on three lab PCs, 261113), the process stays alive with
+/// Winsock torn down: every socket fails with os error 10093 (WSANOTINITIALISED), and because
+/// the process never ends the service never restarts it. `TerminateProcess` on ourselves skips
+/// both the cleanup and the DLL detach handlers.
+pub fn exit_now(code: i32) -> ! {
+    unsafe {
+        winapi::um::processthreadsapi::TerminateProcess(GetCurrentProcess(), code as u32);
+    }
+    std::process::exit(code)
 }
 
 fn nt_terminate_process(process_id: DWORD) -> ResultType<()> {
