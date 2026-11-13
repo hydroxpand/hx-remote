@@ -2563,6 +2563,19 @@ pub fn apply_hx_defaults() {
         .write()
         .unwrap()
         .insert("enable-check-update".to_owned(), "N".to_owned());
+    // Phones (HX Remote for Android / iOS, 261113): the network tab is hidden above, so the
+    // app comes with the company HX Remote server built in. Desktop builds stay without it
+    // and get the server from the installers (--option / settings file).
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        const HX_SERVER: &str = "172.30.1.34";
+        // public key of the company hbbs, not a secret
+        const HX_KEY: &str = "ABuiNiIojpQ534We4SQfM1sW4laAXW8fBEfR7U+IrEU=";
+        let mut s = config::DEFAULT_SETTINGS.write().unwrap();
+        s.insert("custom-rendezvous-server".to_owned(), HX_SERVER.to_owned());
+        s.insert("relay-server".to_owned(), HX_SERVER.to_owned());
+        s.insert("key".to_owned(), HX_KEY.to_owned());
+    }
 }
 
 pub fn load_custom_client() {
