@@ -2,8 +2,10 @@
 # Usage on a PC (PowerShell):
 #   irm ("https://raw.githubusercontent.com/hydroxpand/hx-remote/hx/tools/i.ps1").tolower() -outfile $env:temp\i.ps1; & "$pshome\powershell.exe" -ep bypass -f $env:temp\i.ps1 [password] [tag]
 # Installs (or updates to) an HX Remote build as a service, optionally sets the unattended-access
-# password, registers the auto-update task, and prints the device ID. The elevated window stays open
-# until Enter. Without a tag it takes the newest complete hx-* release. Settings, ID and password
+# password, points the app at the company HX Remote server (ID and relay; the public RustDesk
+# servers now ask the connecting side to sign in), registers the auto-update task, and prints the
+# device ID. Running it again on an installed PC switches that PC to the company server too.
+# The elevated window stays open until Enter. Without a tag it takes the newest complete hx-* release. Settings, ID and password
 # survive an update. Updating from inside an HX Remote session drops that session for a minute.
 # Auto-update: scheduled task "HX Remote Update" runs C:\Program Files\HX-Remote-Updater\hxupdate.ps1
 # as SYSTEM (daily 03:30 and after startup). Pass -noupdater to skip it.
@@ -90,6 +92,15 @@ if ($need) {
 if (-not (Test-Path $app)) { Write-Host "INSTALL FAILED" -ForegroundColor Red; Read-Host "Enter to close"; exit 1 }
 $svc = Get-Service -Name "HX-Remote" -ErrorAction SilentlyContinue
 Write-Host ("service: " + $(if ($svc) { $svc.Status } else { "none" }))
+# company HX Remote server (hbbs/hbbr); the key is the server's public key, not a secret
+$hxServer = "172.30.1.34"
+$hxKey = "ABuiNiIojpQ534We4SQfM1sW4laAXW8fBEfR7U+IrEU="
+$opts = [ordered]@{ "custom-rendezvous-server" = $hxServer; "relay-server" = $hxServer; "key" = $hxKey }
+foreach ($k in $opts.Keys) { & $app --option $k $opts[$k] | Out-Null; Start-Sleep -Milliseconds 500 }
+$of = Join-Path $env:TEMP "hxremote_opt.txt"
+cmd /c "`"$app`" --option custom-rendezvous-server > `"$of`" 2>&1"
+$got = ((Get-Content $of -ErrorAction SilentlyContinue) -join " ").Trim()
+if ($got -eq $hxServer) { Write-Host "server: $hxServer (company)" } else { Write-Host ("server setting not confirmed (got '" + $got + "')") -ForegroundColor Yellow }
 if ($pw) { & $app --password $pw | Out-Null; Start-Sleep -Seconds 2; Write-Host "password set" }
 # auto-update task (script from the hx branch; Program Files is not writable by normal users)
 if (-not $noupdater) {

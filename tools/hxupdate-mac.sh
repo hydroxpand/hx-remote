@@ -19,6 +19,7 @@ APP="$HOME/Applications/HX Remote.app"
 OLD="$HOME/Applications/RustDesk.app"   # name used up to 261111
 PAT='Applications/(HX Remote|RustDesk)\.app/Contents/MacOS/RustDesk'
 TRAY="$HOME/Library/LaunchAgents/com.hydroxpand.hxremote.tray.plist"
+SRV="$HOME/Library/LaunchAgents/com.hydroxpand.hxremote.server.plist"   # "--server", since 261113
 DIR="$HOME/Library/Application Support/HX-Remote-Updater"
 MARK="$DIR/build.txt"          # "<tag> <arch>" of the installed build
 LOG="$DIR/update.log"
@@ -37,6 +38,8 @@ ROSETTA=0
 idle_secs() { ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}'; }
 stop_app() {
   launchctl bootout "gui/$(id -u)/com.hydroxpand.hxremote.tray" 2>/dev/null
+  # the server agent has KeepAlive: unload it, or it restarts the app while it is being replaced
+  launchctl bootout "gui/$(id -u)/com.hydroxpand.hxremote.server" 2>/dev/null
   osascript -e 'tell application id "com.carriez.rustdesk" to quit' >/dev/null 2>&1
   for _ in $(seq 1 20); do pgrep -f "$PAT" >/dev/null || break; sleep 0.5; done
   pkill -f "$PAT" 2>/dev/null; sleep 1
@@ -45,6 +48,7 @@ start_tray() {
   # point the menu bar agent at the current app name, then load it
   [ -f "$TRAY" ] && sed -i '' 's#Applications/RustDesk\.app#Applications/HX Remote.app#g' "$TRAY"
   [ -f "$TRAY" ] && launchctl bootstrap "gui/$(id -u)" "$TRAY" 2>/dev/null
+  [ -f "$SRV" ] && launchctl bootstrap "gui/$(id -u)" "$SRV" 2>/dev/null
 }
 
 # one-time rename RustDesk.app -> HX Remote.app (not while someone is using the Mac)
