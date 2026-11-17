@@ -452,10 +452,11 @@ class _PeerCardState extends State<_PeerCard>
         child,
         // HX: disk / memory badge from the last status check
         Positioned(top: 4, right: 10, child: HxStatusBadge(id: peer.id)),
-        Positioned(bottom: 44, right: 10, child: _hxOpenButton(peer)),
+        // HX (-23): top-left corner is empty, so the button no longer covers the ID line
+        Positioned(top: 6, left: 8, child: _hxOpenButton(peer)),
         if (_shouldBuildPasswordIcon(peer))
           Positioned(
-            top: 4,
+            bottom: 48,
             left: 12,
             child: Icon(Icons.key, size: 12, color: Colors.white),
           ),

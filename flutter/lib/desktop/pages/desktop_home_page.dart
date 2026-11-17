@@ -322,7 +322,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   AutoSizeText(
-                    hxT('비밀번호 (접속할 때마다 바뀜)', translate("One-time Password")),
+                    hxT('비밀번호 (매번 바뀜)', translate("One-time Password")),
                     style: TextStyle(
                         fontSize: 14, color: textColor?.withOpacity(0.5)),
                     maxLines: 1,
