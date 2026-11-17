@@ -1,0 +1,52 @@
+name: HX quick check (flutter analyze)
+# HX: compile-level check of the Dart code in ~15 minutes, before a full release build
+# (no Flutter SDK on the office PCs). Runs on pushes to hx-ui-* branches or by hand.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "hx-ui-*"
+
+env:
+  FLUTTER_VERSION: "3.24.5"
+
+jobs:
+  generate-bridge:
+    uses: ./.github/workflows/bridge.yml
+
+  analyze:
+    needs: [generate-bridge]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Restore bridge files
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: bridge-artifact
+          path: ./
+
+      - name: Install flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: "stable"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Analyze the HX files
+        run: |
+          cd flutter
+          flutter pub get
+          # errors only; upstream code has many infos and warnings
+          flutter analyze --no-fatal-infos --no-fatal-warnings \
+            lib/common/hx_ui.dart \
+            lib/common/hx_update.dart \
+            lib/common/hx_peer_tools.dart \
+            lib/common/widgets/address_book.dart \
+            lib/common/widgets/peer_card.dart \
+            lib/common/widgets/peer_tab_page.dart \
+            lib/common/widgets/peers_view.dart \
+            lib/desktop/pages/desktop_home_page.dart \
+            lib/models/peer_tab_model.dart \
+            lib/models/ab_model.dart \
+            lib/consts.dart

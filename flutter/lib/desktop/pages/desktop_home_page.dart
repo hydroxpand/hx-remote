@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter_hbb/common/hx_ui.dart';
 import 'dart:io';
 import 'dart:convert';
 
@@ -220,7 +221,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          translate("ID"),
+                          hxT('이 PC 번호 (ID)', translate("ID")),
                           style: TextStyle(
                               fontSize: 14,
                               color: Theme.of(context)
@@ -321,7 +322,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   AutoSizeText(
-                    translate("One-time Password"),
+                    hxT('비밀번호 (접속할 때마다 바뀜)', translate("One-time Password")),
                     style: TextStyle(
                         fontSize: 14, color: textColor?.withOpacity(0.5)),
                     maxLines: 1,
@@ -413,7 +414,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    translate("Your Desktop"),
+                    // HX (-22): say what this box is for
+                    hxT('이 PC에 원격으로 들어오려면', translate("Your Desktop")),
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
@@ -424,7 +426,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           ),
           if (!isOutgoingOnly)
             Text(
-              translate("desk_tip"),
+              hxT('다른 사람이 이 PC 화면을 보거나 도와줄 때, 아래 번호와 비밀번호를 알려 주세요. 내가 다른 PC에 들어갈 때는 오른쪽 목록을 쓰면 돼요.',
+                  translate("desk_tip")),
               overflow: TextOverflow.clip,
               style: Theme.of(context).textTheme.bodySmall,
             ),

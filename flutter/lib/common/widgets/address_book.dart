@@ -1,4 +1,5 @@
 import 'dart:math';
+import '../hx_ui.dart';
 
 import 'package:bot_toast/bot_toast.dart';
 import 'package:dropdown_button2/dropdown_button2.dart';
@@ -40,9 +41,8 @@ class _AddressBookState extends State<AddressBook> {
   @override
   Widget build(BuildContext context) => Obx(() {
         if (!gFFI.userModel.isLogin) {
-          return Center(
-              child: ElevatedButton(
-                  onPressed: loginDialog, child: Text(translate("Login"))));
+          // HX (-22): say why the list is empty and what to do
+          return hxLoginPrompt(context, () => loginDialog());
         } else if (gFFI.userModel.networkError.isNotEmpty) {
           return netWorkErrorWidget();
         } else {

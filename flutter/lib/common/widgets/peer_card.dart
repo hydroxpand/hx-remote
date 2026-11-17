@@ -14,6 +14,7 @@ import 'package:provider/provider.dart';
 import '../../common.dart';
 import '../hx_thumbs.dart';
 import '../hx_peer_tools.dart';
+import '../hx_ui.dart';
 import '../../common/formatter/id_formatter.dart';
 import '../../models/peer_model.dart';
 import '../../models/platform_model.dart';
@@ -85,6 +86,24 @@ class _PeerCardState extends State<_PeerCard>
         },
         onLongPress: () => peerTabModel.select(peer),
         child: child);
+  }
+
+  // HX (-22): a visible "open" button, so nobody has to know about the double click.
+  // Hidden while picking several PCs.
+  Widget _hxOpenButton(Peer peer, {bool compact = false}) {
+    final PeerTabModel peerTabModel = Provider.of(context);
+    if (peerTabModel.multiSelectionMode) return const SizedBox.shrink();
+    return ElevatedButton.icon(
+      style: ElevatedButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 10),
+        minimumSize: const Size(0, 26),
+        textStyle: const TextStyle(fontSize: 12),
+      ),
+      onPressed: () => widget.connect(context, peer.id),
+      icon: const Icon(Icons.open_in_new, size: 14),
+      label: Text(hxT('화면 열기', 'Open')),
+    );
   }
 
   Widget _buildPortrait() {
@@ -197,6 +216,7 @@ class _PeerCardState extends State<_PeerCard>
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.titleSmall,
                         )),
+                        hxOnlineText(peer.online).marginOnly(left: 4, right: 4),
                       ]).marginOnly(top: isPortrait ? 0 : 2),
                       Row(
                         children: [
@@ -240,6 +260,8 @@ class _PeerCardState extends State<_PeerCard>
                     ],
                   ).marginOnly(top: 2),
                 ),
+                if (!isPortrait)
+                  _hxOpenButton(peer, compact: true).marginOnly(right: 4),
                 isPortrait
                     ? checkBoxOrActionMorePortrait(peer)
                     : checkBoxOrActionMoreLandscape(peer, isTile: true),
@@ -357,6 +379,15 @@ class _PeerCardState extends State<_PeerCard>
                                   ),
                                 ],
                               ),
+                              // HX (-22): the number is still there, just smaller
+                              if (peer.alias.isNotEmpty)
+                                Text(
+                                  'ID ${formatID(peer.id)}',
+                                  style: const TextStyle(
+                                      color: Colors.white54, fontSize: 11),
+                                  textAlign: TextAlign.center,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               if (_showNote(peer))
                                 Row(
                                   children: [
@@ -396,6 +427,7 @@ class _PeerCardState extends State<_PeerCard>
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.titleSmall,
                         )),
+                        hxOnlineText(peer.online).marginOnly(left: 4),
                       ]).paddingSymmetric(vertical: 8)),
                       checkBoxOrActionMoreLandscape(peer, isTile: false),
                     ],
@@ -420,6 +452,7 @@ class _PeerCardState extends State<_PeerCard>
         child,
         // HX: disk / memory badge from the last status check
         Positioned(top: 4, right: 10, child: HxStatusBadge(id: peer.id)),
+        Positioned(bottom: 44, right: 10, child: _hxOpenButton(peer)),
         if (_shouldBuildPasswordIcon(peer))
           Positioned(
             top: 4,

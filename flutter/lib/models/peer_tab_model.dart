@@ -108,6 +108,27 @@ class PeerTabModel with ChangeNotifier {
     } catch (e) {
       debugPrint("failed to get peer tab order list: $e");
     }
+    // HX (CEO request 261117, -22): company PCs first, then favorites and recent; the
+    // "Discovered" (LAN scan) and "Accessible devices" (paid server) tabs start hidden.
+    // Once per install; a right click on the tab bar can show them again.
+    if (bind.getLocalFlutterOption(k: kHxTabLayoutDone) != 'Y') {
+      final hxOrder = [
+        PeerTabIndex.ab.index,
+        PeerTabIndex.fav.index,
+        PeerTabIndex.recent.index,
+        PeerTabIndex.lan.index,
+        PeerTabIndex.group.index,
+      ];
+      for (int i = 0; i < orders.length; i++) {
+        orders[i] = hxOrder[i];
+      }
+      _isVisible[PeerTabIndex.lan.index] = false;
+      _isVisible[PeerTabIndex.group.index] = false;
+      bind.setLocalFlutterOption(k: kOptionPeerTabOrder, v: jsonEncode(orders));
+      bind.setLocalFlutterOption(
+          k: kOptionPeerTabVisible, v: jsonEncode(_isVisible));
+      bind.setLocalFlutterOption(k: kHxTabLayoutDone, v: 'Y');
+    }
     // init currentTab
     // HX (CEO request 261117): open on the address book, where company PCs show by name,
     // instead of recent sessions (bare IDs). Applied once per install, also to people who

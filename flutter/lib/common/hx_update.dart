@@ -91,6 +91,22 @@ Future<List<HxRelease>> hxFetchReleases() async {
   }
 }
 
+/// HX (-22): true when build.txt shows a different build within [timeout].
+/// On success the app restarts, so a false answer is what the user sees.
+Future<bool> hxWaitForNewBuild(String? before,
+    {Duration timeout = const Duration(minutes: 5)}) async {
+  final end = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(end)) {
+    await Future.delayed(const Duration(seconds: 15));
+    final now = await hxInstalledBuild();
+    if (now != null && now != before) return true;
+  }
+  return false;
+}
+
+const kHxUpdateFailed = '업데이트하지 못했어요. 5분이 지나도 버전이 그대로예요. '
+    '이 PC는 보안 설정 때문에 자동 업데이트가 막혀 있을 수 있어요. 관리자에게 알려 주세요.';
+
 /// Start the update now. Returns a message for the user.
 Future<String> hxStartUpdate() async {
   try {
@@ -254,17 +270,23 @@ class _HxUpdatePanelState extends State<HxUpdatePanel> {
                 ? null
                 : () async {
                     setState(() => _starting = true);
+                    final before = await hxInstalledBuild();
                     String msg;
+                    var started = true;
                     try {
                       msg = await hxStartUpdate();
                     } catch (e) {
                       msg = '업데이트를 시작하지 못했어요 ($e)';
+                      started = false;
                     }
                     if (!mounted) return;
                     setState(() {
                       _starting = false;
                       _message = msg;
                     });
+                    if (started && !await hxWaitForNewBuild(before) && mounted) {
+                      setState(() => _message = kHxUpdateFailed);
+                    }
                   },
             child: Text(_starting ? '시작하는 중...' : '지금 업데이트'),
           ),
@@ -451,17 +473,25 @@ class _HxHomeUpdateCardState extends State<HxHomeUpdateCard> {
                         ? null
                         : () async {
                             setState(() => _starting = true);
+                            final before = await hxInstalledBuild();
                             String msg;
+                            var started = true;
                             try {
                               msg = await hxStartUpdate();
                             } catch (e) {
                               msg = '업데이트를 시작하지 못했어요 ($e)';
+                              started = false;
                             }
                             if (!mounted) return;
                             setState(() {
                               _starting = false;
                               _message = msg;
                             });
+                            if (started &&
+                                !await hxWaitForNewBuild(before) &&
+                                mounted) {
+                              setState(() => _message = kHxUpdateFailed);
+                            }
                           },
                     child: Text(_starting ? '시작하는 중...' : '지금 업데이트',
                         style: const TextStyle(fontSize: 12)),

@@ -148,6 +148,7 @@ const String kOptionEnableFileCopyPaste = "enable-file-copy-paste";
 // HX: open on the company address book (CEO request 261117)
 const String kHxAbTabDefaultDone = "hx-ab-tab-default-done";
 const String kHxCompanyAbDefaultDone = "hx-company-ab-default-done";
+const String kHxTabLayoutDone = "hx-tab-layout-done"; // -22 tab order and hidden tabs
 const String kHxCompanyAbName = "회사 PC"; // shared book on the company rustdesk-api
 // "Settings -> Display -> Other default options"
 const String kOptionDisableClipboard = "disable_clipboard";

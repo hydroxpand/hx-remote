@@ -26,6 +26,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 import '../../common.dart';
 import '../hx_batch.dart';
 import '../hx_peer_tools.dart';
+import '../hx_ui.dart';
 import '../../models/platform_model.dart';
 
 class PeerTabPage extends StatefulWidget {
@@ -118,20 +119,43 @@ class _PeerTabPageState extends State<PeerTabPage>
                 padding: stateGlobal.isPortrait.isTrue
                     ? EdgeInsets.symmetric(horizontal: 2)
                     : null,
-                child: selectionWrap(Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                        child: visibleContextMenuListener(
-                            _createSwitchBar(context))),
-                    if (stateGlobal.isPortrait.isTrue)
-                      ..._portraitRightActions(context)
-                    else
-                      ..._landscapeRightActions(context)
-                  ],
-                )),
+                child: stateGlobal.isPortrait.isTrue
+                    ? selectionWrap(Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                              child: visibleContextMenuListener(
+                                  _createSwitchBar(context))),
+                          ..._portraitRightActions(context)
+                        ],
+                      ))
+                    // HX (-22): tabs alone on the first line, labelled tools below
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                              child: visibleContextMenuListener(
+                                  _createSwitchBar(context))),
+                        ],
+                      ),
               ),
             ).paddingOnly(right: stateGlobal.isPortrait.isTrue ? 0 : 12)),
+        Obx(() => stateGlobal.isPortrait.isTrue
+            ? const SizedBox.shrink()
+            : Padding(
+                padding: const EdgeInsets.only(top: 8, right: 12),
+                child: model.multiSelectionMode
+                    ? SizedBox(
+                        height: 32,
+                        child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: createMultiSelectionBar(model)))
+                    : Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: _landscapeRightActions(context)),
+              )),
         _createPeersView(),
       ],
     );
@@ -172,8 +196,16 @@ class _PeerTabPageState extends State<PeerTabPage>
                         decoration: (hover.value
                             ? (selected ? decoBorder : deco)
                             : (selected ? decoBorder : null)),
-                        child: Icon(model.tabIcon(t), color: color)
-                            .paddingSymmetric(horizontal: 4),
+                        // HX (-22): the tab name next to the icon
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(model.tabIcon(t), color: color, size: 16),
+                            const SizedBox(width: 4),
+                            Text(hxTabLabel(t),
+                                style: TextStyle(color: color, fontSize: 13)),
+                          ],
+                        ).paddingSymmetric(horizontal: 6),
                       ).paddingSymmetric(horizontal: 4),
                       onTap: isOptionFixed(kOptionPeerTabIndex)
                           ? null
@@ -624,33 +656,28 @@ class _PeerTabPageState extends State<PeerTabPage>
 
   List<Widget> _landscapeRightActions(BuildContext context) {
     final model = Provider.of<PeerTabModel>(context);
+    // HX (-22): one labelled row; buttons that do not apply to this tab are left out
     return [
-      const PeerSearchBar().marginOnly(right: 13),
+      const PeerSearchBar().marginOnly(right: 8),
+      if (model.currentTab == PeerTabIndex.ab.index ||
+          model.currentTab == PeerTabIndex.group.index)
+        _hoverAction(
+            context: context,
+            toolTip: translate('Refresh'),
+            child: const Icon(Icons.refresh, size: 18),
+            onTap: () {
+              final t = gFFI.peerTabModel.currentTab;
+              if (t < entries.length) entries[t].load?.call();
+            }),
+      if (model.currentTabCachedPeers.isNotEmpty) _createMultiSelection(),
       // HX: saved PC groups and the status check
       if (isDesktop) const HxGroupsButton(),
       if (isDesktop)
         HxStatusButton(peers: () => model.currentTabCachedPeers.toList()),
-      _createRefresh(
-          index: PeerTabIndex.ab, loading: gFFI.abModel.currentAbLoading),
-      _createRefresh(
-          index: PeerTabIndex.group, loading: gFFI.groupModel.groupLoading),
-      Offstage(
-        offstage: model.currentTabCachedPeers.isEmpty,
-        child: _createMultiSelection(),
-      ),
       _createPeerViewTypeSwitch(context),
-      Offstage(
-        offstage: model.currentTab == PeerTabIndex.recent.index,
-        child: PeerSortDropdown(),
-      ),
-      Offstage(
-        offstage: !_showWebConsole(model),
-        child: _openWebConsole(),
-      ),
-      Offstage(
-        offstage: model.currentTab != PeerTabIndex.ab.index,
-        child: _toggleTags(),
-      ),
+      if (model.currentTab != PeerTabIndex.recent.index) PeerSortDropdown(),
+      if (model.currentTab == PeerTabIndex.ab.index) _toggleTags(),
+      if (_showWebConsole(model)) _openWebConsole(),
     ];
   }
 
@@ -746,7 +773,9 @@ class PeerSearchBar extends StatefulWidget {
 }
 
 class _PeerSearchBarState extends State<PeerSearchBar> {
-  var drawer = false;
+  // HX (-22): always open on the desktop so people see where to type
+  var drawer = isDesktop || isWebDesktop;
+  var _opened = false; // opened by a click: take the keyboard focus
 
   @override
   Widget build(BuildContext context) {
@@ -759,6 +788,7 @@ class _PeerSearchBarState extends State<PeerSearchBar> {
             onTap: () {
               setState(() {
                 drawer = true;
+                _opened = true;
               });
             },
             child: Icon(
@@ -777,7 +807,7 @@ class _PeerSearchBarState extends State<PeerSearchBar> {
           extentOffset: peerSearchTextController.value.text.length);
     });
     return Obx(() => Container(
-          width: stateGlobal.isPortrait.isTrue ? 120 : 140,
+          width: stateGlobal.isPortrait.isTrue ? 120 : 220,
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.background,
             borderRadius: BorderRadius.circular(6),
@@ -793,7 +823,7 @@ class _PeerSearchBarState extends State<PeerSearchBar> {
                     ).marginSymmetric(horizontal: 4),
                     Expanded(
                       child: TextField(
-                        autofocus: true,
+                        autofocus: _opened,
                         controller: peerSearchTextController,
                         onChanged: (searchText) {
                           peerSearchText.value = searchText;
@@ -813,7 +843,10 @@ class _PeerSearchBarState extends State<PeerSearchBar> {
                           contentPadding:
                               const EdgeInsets.symmetric(vertical: 6),
                           hintText:
-                              focused.value ? null : translate("Search ID"),
+                              focused.value
+                                  ? null
+                                  : hxT('PC 이름이나 ID로 찾기',
+                                      translate("Search ID")),
                           hintStyle: TextStyle(
                               fontSize: 14, color: Theme.of(context).hintColor),
                           border: InputBorder.none,
@@ -829,7 +862,7 @@ class _PeerSearchBarState extends State<PeerSearchBar> {
                         setState(() {
                           peerSearchTextController.clear();
                           peerSearchText.value = "";
-                          drawer = false;
+                          drawer = isDesktop || isWebDesktop;
                         });
                       },
                       icon: Tooltip(
@@ -1088,6 +1121,14 @@ Widget _hoverAction(
     GestureTapDownCallback? onTapDown,
     RxBool? hoverableWhenfalse,
     EdgeInsetsGeometry padding = const EdgeInsets.all(4.0)}) {
+  // HX (-22): on the desktop list every icon button also shows its name
+  if ((isDesktop || isWebDesktop) && stateGlobal.isPortrait.isFalse) {
+    child = Row(mainAxisSize: MainAxisSize.min, children: [
+      child,
+      const SizedBox(width: 4),
+      Text(hxActionLabel(toolTip), style: const TextStyle(fontSize: 12)),
+    ]).paddingSymmetric(horizontal: 2);
+  }
   final hover = false.obs;
   final deco = BoxDecoration(
     color: Theme.of(context).colorScheme.background,

@@ -12,6 +12,7 @@ import '../consts.dart';
 import '../models/peer_model.dart';
 import '../models/platform_model.dart';
 import 'hx_batch.dart';
+import 'hx_ui.dart';
 
 // ---------------------------------------------------------------- groups
 const _kGroupsKey = 'hx-peer-groups';
@@ -128,9 +129,14 @@ class HxGroupsButton extends StatelessWidget {
       },
       child: Tooltip(
         message: 'PC 묶음 (한 번에 모아 보기)',
-        child: Icon(Icons.dashboard_outlined,
-                size: 18, color: Theme.of(context).textTheme.titleLarge?.color)
-            .marginSymmetric(horizontal: 6),
+        // HX (-22): name next to the icon
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.dashboard_outlined,
+              size: 18, color: Theme.of(context).textTheme.titleLarge?.color),
+          const SizedBox(width: 4),
+          Text(hxT('저장한 묶음', 'Saved groups'),
+              style: const TextStyle(fontSize: 12)),
+        ]).marginSymmetric(horizontal: 6, vertical: 4),
       ),
     );
   }
@@ -223,15 +229,20 @@ class HxStatusButton extends StatelessWidget {
         onTap: busy ? null : () => HxStatus.refresh(peers()),
         child: Tooltip(
           message: busy ? '상태 확인 중...' : 'PC 상태 확인 (디스크, 메모리, 켜진 시간)',
-          child: (busy
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : Icon(Icons.monitor_heart_outlined,
-                      size: 18,
-                      color: Theme.of(context).textTheme.titleLarge?.color))
-              .marginSymmetric(horizontal: 6),
+          // HX (-22): name next to the icon
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            busy
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : Icon(Icons.monitor_heart_outlined,
+                    size: 18,
+                    color: Theme.of(context).textTheme.titleLarge?.color),
+            const SizedBox(width: 4),
+            Text(busy ? hxT('확인 중...', 'Checking...') : hxT('PC 상태 보기', 'PC status'),
+                style: const TextStyle(fontSize: 12)),
+          ]).marginSymmetric(horizontal: 6, vertical: 4),
         ),
       ),
     );

@@ -17,6 +17,7 @@ import '../../common.dart';
 import '../../models/peer_model.dart';
 import '../../models/platform_model.dart';
 import 'peer_card.dart';
+import '../hx_ui.dart';
 
 typedef PeerFilter = bool Function(Peer peer);
 typedef PeerCardBuilder = Widget Function(Peer peer);
@@ -260,6 +261,35 @@ class _PeersViewState extends State<_PeersView>
                   : Container(child: visibilityChild);
             }
 
+            // HX (-22): company PCs in sections by room (the first tag), same rooms as the hub
+            final hxRooms = widget.peers.loadEvent == LoadEvent.addressBook &&
+                peers.any((p) => hxRoomOf(p).isNotEmpty);
+            Widget hxGrouped() {
+              final groups = hxGroupByRoom(peers);
+              final isList = peerCardUiType.value == PeerUiType.list;
+              return ListView(
+                controller: _scrollController,
+                children: [
+                  for (final g in groups) ...[
+                    hxRoomHeader(context, g.key, g.value.length),
+                    if (isList)
+                      for (final p in g.value)
+                        buildOnePeer(p, false)
+                            .marginOnly(right: space, bottom: space / 2)
+                    else
+                      Wrap(
+                        spacing: space,
+                        runSpacing: space / 2,
+                        children: [
+                          for (final p in g.value) buildOnePeer(p, false)
+                        ],
+                      ),
+                    SizedBox(height: space),
+                  ],
+                ],
+              );
+            }
+
             // We should avoid too many rebuilds. Win10(Some machines) on Flutter 3.19.6.
             // Continious rebuilds of `ListView.builder` will cause memory leak.
             // Simple demo can reproduce this issue.
@@ -271,7 +301,9 @@ class _PeersViewState extends State<_PeersView>
                           top: index == 0 ? 0 : space / 2, bottom: space / 2);
                     },
                   )
-                : peerCardUiType.value == PeerUiType.list
+                : hxRooms && peerCardUiType.value != PeerUiType.tile
+                    ? hxGrouped()
+                    : peerCardUiType.value == PeerUiType.list
                     ? ListView.builder(
                         controller: _scrollController,
                         itemCount: peers.length,
@@ -403,6 +435,19 @@ class _PeersViewState extends State<_PeersView>
       return peers;
     }
     searchText = searchText.toLowerCase();
+    // HX (-22): a name typed on any tab also finds the PCs of the other lists
+    final seen = peers.map((p) => p.id).toSet();
+    final extra = <Peer>[];
+    for (final src in [
+      gFFI.abModel.currentAbPeers.toList(),
+      gFFI.favoritePeersModel.peers,
+      gFFI.recentPeersModel.peers,
+    ]) {
+      for (final p in src) {
+        if (seen.add(p.id)) extra.add(p);
+      }
+    }
+    peers = [...peers, ...extra];
     final matches = await Future.wait(
         peers.map((peer) => matchPeer(searchText, peer, widget.peerTabIndex)));
     final filteredList = List<Peer>.empty(growable: true);
