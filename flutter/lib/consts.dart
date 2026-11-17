@@ -145,6 +145,10 @@ const String kOptionZoomCursor = "zoom-cursor";
 const String kOptionShowQualityMonitor = "show_quality_monitor";
 const String kOptionDisableAudio = "disable_audio";
 const String kOptionEnableFileCopyPaste = "enable-file-copy-paste";
+// HX: open on the company address book (CEO request 261117)
+const String kHxAbTabDefaultDone = "hx-ab-tab-default-done";
+const String kHxCompanyAbDefaultDone = "hx-company-ab-default-done";
+const String kHxCompanyAbName = "회사 PC"; // shared book on the company rustdesk-api
 // "Settings -> Display -> Other default options"
 const String kOptionDisableClipboard = "disable_clipboard";
 const String kOptionLockAfterSessionEnd = "lock_after_session_end";

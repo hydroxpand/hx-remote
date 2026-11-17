@@ -376,7 +376,13 @@ class _PeersViewState extends State<_PeersView>
     if (widget.peers.loadEvent != LoadEvent.recent) {
       switch (sortedBy) {
         case PeerSortType.remoteId:
-          peers.sort((p1, p2) => p1.getId().compareTo(p2.getId()));
+          // HX (261117): PCs with a name (alias) first, in name order, then the rest by ID
+          peers.sort((p1, p2) {
+            final a1 = p1.alias.trim(), a2 = p2.alias.trim();
+            if (a1.isNotEmpty && a2.isNotEmpty) return a1.compareTo(a2);
+            if (a1.isNotEmpty != a2.isNotEmpty) return a1.isNotEmpty ? -1 : 1;
+            return p1.getId().compareTo(p2.getId());
+          });
           break;
         case PeerSortType.remoteHost:
           peers.sort((p1, p2) =>

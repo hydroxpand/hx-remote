@@ -109,6 +109,14 @@ class PeerTabModel with ChangeNotifier {
       debugPrint("failed to get peer tab order list: $e");
     }
     // init currentTab
+    // HX (CEO request 261117): open on the address book, where company PCs show by name,
+    // instead of recent sessions (bare IDs). Applied once per install, also to people who
+    // already used the app; a tab they pick afterwards is remembered as before.
+    if (bind.getLocalFlutterOption(k: kHxAbTabDefaultDone) != 'Y') {
+      bind.setLocalFlutterOption(
+          k: kOptionPeerTabIndex, v: PeerTabIndex.ab.index.toString());
+      bind.setLocalFlutterOption(k: kHxAbTabDefaultDone, v: 'Y');
+    }
     _currentTab =
         int.tryParse(bind.getLocalFlutterOption(k: kOptionPeerTabIndex)) ?? 0;
     if (_currentTab < 0 || _currentTab >= maxTabCount) {

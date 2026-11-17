@@ -184,6 +184,14 @@ class AbModel {
         if (!listInitialized) {
           listInitialized = true;
           trySetCurrentToLast();
+          // HX (CEO request 261117): the first time a person signs in, show the shared
+          // company book (all lab PCs by name) rather than their empty personal book.
+          if (bind.getLocalFlutterOption(k: kHxCompanyAbDefaultDone) != 'Y' &&
+              addressbooks.containsKey(kHxCompanyAbName)) {
+            _currentName.value = kHxCompanyAbName;
+            bind.setLocalFlutterOption(k: kOptionCurrentAbName, v: kHxCompanyAbName);
+            bind.setLocalFlutterOption(k: kHxCompanyAbDefaultDone, v: 'Y');
+          }
         }
         if (!addressbooks.containsKey(_currentName.value)) {
           setCurrentName(legacyMode.value
