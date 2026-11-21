@@ -1,6 +1,7 @@
 //! HX Remote data mode (261121): pick image settings for the network this computer is on.
 //!
-//! - low  (저데이터): phone hotspot or a network marked "Low Data Mode" — 10% quality, 5 fps,
+//! - low  (저데이터): phone hotspot, a network marked "Low Data Mode" (macOS) or a metered
+//!   connection (Windows) — 10% quality, 5 fps,
 //!   4:2:0, no audio. Keeps a remote screen usable at well under 1 Mbps.
 //! - high (고데이터): everything else — 50% quality, 20 fps, 4:4:4, audio on.
 //!
@@ -90,8 +91,57 @@ pub fn network_is_low_data() -> bool {
         .unwrap_or(false)
 }
 
-/// Other platforms: no detection yet — auto means high; pick low from the toolbar.
-#[cfg(not(target_os = "macos"))]
+/// True when Windows reports the current internet connection as metered (a phone
+/// hotspot Windows recognises, mobile broadband, or "Set as metered connection" turned
+/// on for this Wi-Fi), roaming or over its data limit.
+#[cfg(target_os = "windows")]
+pub fn network_is_low_data() -> bool {
+    // COM in its own thread so the caller's apartment does not matter.
+    match std::thread::spawn(windows_connection_cost).join() {
+        Ok(Ok(cost)) => {
+            use windows::Win32::Networking::NetworkListManager::{
+                NLM_CONNECTION_COST_FIXED, NLM_CONNECTION_COST_OVERDATALIMIT,
+                NLM_CONNECTION_COST_ROAMING, NLM_CONNECTION_COST_VARIABLE,
+            };
+            let low_mask = NLM_CONNECTION_COST_FIXED.0
+                | NLM_CONNECTION_COST_VARIABLE.0
+                | NLM_CONNECTION_COST_ROAMING.0
+                | NLM_CONNECTION_COST_OVERDATALIMIT.0;
+            log::info!("HX data mode: connection cost = 0x{:x}", cost);
+            cost as i32 & low_mask != 0
+        }
+        Ok(Err(e)) => {
+            log::warn!("HX data mode: connection cost unavailable: {}", e);
+            false
+        }
+        Err(_) => false,
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn windows_connection_cost() -> windows::core::Result<u32> {
+    use windows::Win32::{
+        Networking::NetworkListManager::{INetworkCostManager, NetworkListManager},
+        System::Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_MULTITHREADED},
+    };
+    unsafe {
+        let init = CoInitializeEx(None, COINIT_MULTITHREADED);
+        let result: windows::core::Result<u32> = (|| {
+            let manager: INetworkCostManager =
+                CoCreateInstance(&NetworkListManager, None, CLSCTX_ALL)?;
+            let mut cost = 0u32;
+            manager.GetCost(&mut cost, std::ptr::null())?;
+            Ok(cost)
+        })();
+        if init.is_ok() {
+            CoUninitialize();
+        }
+        result
+    }
+}
+
+/// Linux: no detection — auto means high; pick low from the toolbar.
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn network_is_low_data() -> bool {
     false
 }

@@ -51,3 +51,19 @@ jobs:
             lib/models/peer_tab_model.dart \
             lib/models/ab_model.dart \
             lib/consts.dart
+
+  # HX: build and run src/hx_data_mode.rs alone on Windows and macOS (a few minutes),
+  # so a Windows-only compile error shows up before the hour-long release build.
+  data-mode-check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Build and run the data mode check
+        shell: bash
+        run: cd tools/hx-datamode-check && cargo run

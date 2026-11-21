@@ -1,0 +1,20 @@
+# HX: compiles and runs src/hx_data_mode.rs on its own (CI quick check, hx-analyze.yml).
+[package]
+name = "hx-datamode-check"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+hbb_common = { path = "hbb_common" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block = "0.1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "=0.61.1", features = [
+    "Win32_Foundation",
+    "Win32_Networking_NetworkListManager",
+    "Win32_System_Com",
+] }
