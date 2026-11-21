@@ -43,6 +43,7 @@ jobs:
             lib/common/hx_update.dart \
             lib/common/hx_peer_tools.dart \
             lib/common/widgets/address_book.dart \
+            lib/common/widgets/toolbar.dart \
             lib/common/widgets/peer_card.dart \
             lib/common/widgets/peer_tab_page.dart \
             lib/common/widgets/peers_view.dart \

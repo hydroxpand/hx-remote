@@ -830,16 +830,66 @@ Future<List<TRadioMenu<String>>> toolbarViewStyle(
   ], ownedActionIds: _kToolbarViewStyleActionIds);
 }
 
+// HX Remote data mode (261121): same presets as src/hx_data_mode.rs.
+const _kHxDataLow = 'hx-data-low';
+const _kHxDataHigh = 'hx-data-high';
+
+Future<void> hxApplyDataMode(FFI ffi, bool low) async {
+  final sessionId = ffi.sessionId;
+  await bind.sessionSetImageQuality(
+      sessionId: sessionId, value: kRemoteImageQualityCustom);
+  await bind.sessionSetCustomImageQuality(
+      sessionId: sessionId, value: low ? 10 : 50);
+  await bind.sessionSetCustomFps(sessionId: sessionId, fps: low ? 5 : 20);
+  final i444 = bind.sessionGetToggleOptionSync(sessionId: sessionId, arg: 'i444');
+  if (i444 == low) {
+    await bind.sessionToggleOption(sessionId: sessionId, value: 'i444');
+    bind.sessionChangePreferCodec(sessionId: sessionId);
+  }
+  final noAudio =
+      bind.sessionGetToggleOptionSync(sessionId: sessionId, arg: 'disable-audio');
+  if (noAudio != low) {
+    await bind.sessionToggleOption(sessionId: sessionId, value: 'disable-audio');
+  }
+  await bind.sessionPeerOption(
+      sessionId: sessionId, name: 'hx-data-mode-now', value: low ? 'low' : 'high');
+}
+
 Future<List<TRadioMenu<String>>> toolbarImageQuality(
     BuildContext context, String id, FFI ffi) async {
-  final groupValue =
+  var groupValue =
       await bind.sessionGetImageQuality(sessionId: ffi.sessionId) ?? '';
+  if (groupValue == kRemoteImageQualityCustom) {
+    final now = await bind.sessionGetOption(
+            sessionId: ffi.sessionId, arg: 'hx-data-mode-now') ??
+        '';
+    if (now == 'low') groupValue = _kHxDataLow;
+    if (now == 'high') groupValue = _kHxDataHigh;
+  }
   onChanged(String? value) async {
     if (value == null) return;
+    if (value == _kHxDataLow || value == _kHxDataHigh) {
+      await hxApplyDataMode(ffi, value == _kHxDataLow);
+      return;
+    }
+    await bind.sessionPeerOption(
+        sessionId: ffi.sessionId, name: 'hx-data-mode-now', value: '');
     await bind.sessionSetImageQuality(sessionId: ffi.sessionId, value: value);
   }
 
   return _registerRadioMenuShortcuts(ffi, [
+    TRadioMenu<String>(
+      child: Text('저데이터 (핫스팟)'),
+      value: _kHxDataLow,
+      groupValue: groupValue,
+      onChanged: onChanged,
+    ),
+    TRadioMenu<String>(
+      child: Text('고데이터 (와이파이)'),
+      value: _kHxDataHigh,
+      groupValue: groupValue,
+      onChanged: onChanged,
+    ),
     TRadioMenu<String>(
         child: Text(translate('Good image quality')),
         value: kRemoteImageQualityBest,

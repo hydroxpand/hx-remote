@@ -7083,6 +7083,7 @@ dependencies = [
  "async-process",
  "async-trait",
  "base",
+ "block",
  "bytemuck",
  "bytes",
  "cc",

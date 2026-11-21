@@ -2951,7 +2951,13 @@ impl LoginConfigHandler {
 
         self.id = id;
         self.conn_type = conn_type;
-        let config = self.load_config();
+        #[allow(unused_mut)]
+        let mut config = self.load_config();
+        // HX Remote: low/high data settings by network for remote-desktop sessions (261121)
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        if conn_type == ConnType::DEFAULT_CONN {
+            crate::hx_data_mode::apply_on_connect(&self.id, &mut config);
+        }
         self.remember = !config.password.is_empty();
         self.config = config;
 
