@@ -3746,6 +3746,19 @@ impl LoginConfigHandler {
                 config.keyboard_mode = KeyboardMode::Legacy.to_string();
             }
         }
+        // HX Remote (261121 대표): from a Mac to a Windows PC, turn "Swap control-command key" on
+        // once per peer, so Cmd+C/V/Z work as Ctrl+C/V/Z like on the Mac. Done only the first time
+        // (peer option hx-swap-key-set), so turning it off in the keyboard menu sticks.
+        #[cfg(target_os = "macos")]
+        if pi.platform == crate::common::PLATFORM_WINDOWS
+            && !config.options.contains_key("hx-swap-key-set")
+        {
+            config.allow_swap_key.v = true;
+            config
+                .options
+                .insert("hx-swap-key-set".to_owned(), "Y".to_owned());
+            log::info!("HX: swap control-command key on for {}", self.id);
+        }
         // no matter if change, for update file time
         self.save_config(config);
         self.supported_encoding = pi.encoding.clone().unwrap_or_default();
