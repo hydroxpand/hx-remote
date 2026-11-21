@@ -1,12 +1,16 @@
 //! HX Remote data mode (261121): pick image settings for the network this computer is on.
 //!
-//! - low  (저데이터): phone hotspot, a network marked "Low Data Mode" (macOS) or a metered
+//! - low   (저데이터): phone hotspot, a network marked "Low Data Mode" (macOS) or a metered
 //!   connection (Windows) — 10% quality, 5 fps,
 //!   4:2:0, no audio. Keeps a remote screen usable at well under 1 Mbps.
-//! - high (고데이터): everything else — 50% quality, 20 fps, 4:4:4, audio on.
+//! - high  (고데이터): everything else — 50% quality, 20 fps, 4:4:4, audio on.
+//! - ultra (초고화질, 261121 대표): fast Wi-Fi or wired — 200% quality, 30 fps, 4:4:4, audio on.
+//!   About 8 Mbps at 1080p, 20 Mbps at 4K. Never picked for a hotspot.
 //!
 //! Local option `hx-data-mode`: "" or "auto" (default) picks by network at connect time,
-//! "low" / "high" pins one. The mode applied to a peer is kept in the peer option
+//! "low" / "high" / "ultra" pins one. In auto, a non-hotspot network gets high, or ultra when
+//! the last choice made from the toolbar on such a network was ultra (local option
+//! `hx-wifi-quality`). The mode applied to a peer is kept in the peer option
 //! `hx-data-mode-now`, which the toolbar reads to show the current choice.
 //! The toolbar can switch a running session (flutter/lib/common/widgets/toolbar.dart).
 
@@ -16,6 +20,7 @@ use hbb_common::{
 };
 
 pub const OPTION_MODE: &str = "hx-data-mode";
+pub const OPTION_WIFI_QUALITY: &str = "hx-wifi-quality";
 pub const PEER_OPTION_NOW: &str = "hx-data-mode-now";
 
 pub struct Preset {
@@ -39,19 +44,60 @@ pub const HIGH: Preset = Preset {
     audio: true,
 };
 
-/// Decide the mode for a new remote-desktop session: true = low data.
-pub fn want_low_data() -> bool {
+pub const ULTRA: Preset = Preset {
+    quality: 200,
+    fps: 30,
+    i444: true,
+    audio: true,
+};
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Mode {
+    Low,
+    High,
+    Ultra,
+}
+
+impl Mode {
+    pub fn preset(self) -> &'static Preset {
+        match self {
+            Mode::Low => &LOW,
+            Mode::High => &HIGH,
+            Mode::Ultra => &ULTRA,
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Mode::Low => "low",
+            Mode::High => "high",
+            Mode::Ultra => "ultra",
+        }
+    }
+}
+
+/// Decide the mode for a new remote-desktop session.
+pub fn want_mode() -> Mode {
     match LocalConfig::get_option(OPTION_MODE).as_str() {
-        "low" => true,
-        "high" => false,
-        _ => network_is_low_data(),
+        "low" => Mode::Low,
+        "high" => Mode::High,
+        "ultra" => Mode::Ultra,
+        _ => {
+            if network_is_low_data() {
+                Mode::Low
+            } else if LocalConfig::get_option(OPTION_WIFI_QUALITY) == "ultra" {
+                Mode::Ultra
+            } else {
+                Mode::High
+            }
+        }
     }
 }
 
 /// Write the preset into the peer config so every existing code path
 /// (option message, codec choice, toolbar menus) sees it.
-pub fn apply(config: &mut PeerConfig, low: bool) {
-    let p = if low { &LOW } else { &HIGH };
+pub fn apply(config: &mut PeerConfig, mode: Mode) {
+    let p = mode.preset();
     config.image_quality = "custom".to_owned();
     config.custom_image_quality = vec![p.quality];
     config
@@ -63,22 +109,22 @@ pub fn apply(config: &mut PeerConfig, low: bool) {
         config.options.remove("i444");
     }
     config.disable_audio.v = !p.audio;
-    config.options.insert(
-        PEER_OPTION_NOW.to_owned(),
-        if low { "low" } else { "high" }.to_owned(),
-    );
+    config
+        .options
+        .insert(PEER_OPTION_NOW.to_owned(), mode.name().to_owned());
 }
 
 /// Called when a remote-desktop session starts.
 pub fn apply_on_connect(id: &str, config: &mut PeerConfig) {
-    let low = want_low_data();
-    apply(config, low);
+    let mode = want_mode();
+    apply(config, mode);
     config.store(id);
     log::info!(
-        "HX data mode for {}: {} (setting '{}')",
+        "HX data mode for {}: {} (setting '{}', wifi '{}')",
         id,
-        if low { "low" } else { "high" },
-        LocalConfig::get_option(OPTION_MODE)
+        mode.name(),
+        LocalConfig::get_option(OPTION_MODE),
+        LocalConfig::get_option(OPTION_WIFI_QUALITY)
     );
 }
 

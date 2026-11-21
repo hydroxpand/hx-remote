@@ -833,26 +833,44 @@ Future<List<TRadioMenu<String>>> toolbarViewStyle(
 // HX Remote data mode (261121): same presets as src/hx_data_mode.rs.
 const _kHxDataLow = 'hx-data-low';
 const _kHxDataHigh = 'hx-data-high';
+const _kHxDataUltra = 'hx-data-ultra';
 
-Future<void> hxApplyDataMode(FFI ffi, bool low) async {
+// mode: 'low' | 'high' | 'ultra' -> (quality %, fps, 4:4:4, audio)
+const Map<String, List<Object>> _kHxDataPresets = {
+  'low': [10, 5, false, false],
+  'high': [50, 20, true, true],
+  'ultra': [200, 30, true, true],
+};
+
+Future<void> hxApplyDataMode(FFI ffi, String mode) async {
+  final p = _kHxDataPresets[mode] ?? _kHxDataPresets['high']!;
+  final quality = p[0] as int;
+  final fps = p[1] as int;
+  final wantI444 = p[2] as bool;
+  final wantAudio = p[3] as bool;
   final sessionId = ffi.sessionId;
   await bind.sessionSetImageQuality(
       sessionId: sessionId, value: kRemoteImageQualityCustom);
   await bind.sessionSetCustomImageQuality(
-      sessionId: sessionId, value: low ? 10 : 50);
-  await bind.sessionSetCustomFps(sessionId: sessionId, fps: low ? 5 : 20);
+      sessionId: sessionId, value: quality);
+  await bind.sessionSetCustomFps(sessionId: sessionId, fps: fps);
   final i444 = bind.sessionGetToggleOptionSync(sessionId: sessionId, arg: 'i444');
-  if (i444 == low) {
+  if (i444 != wantI444) {
     await bind.sessionToggleOption(sessionId: sessionId, value: 'i444');
     bind.sessionChangePreferCodec(sessionId: sessionId);
   }
   final noAudio =
       bind.sessionGetToggleOptionSync(sessionId: sessionId, arg: 'disable-audio');
-  if (noAudio != low) {
+  if (noAudio == wantAudio) {
     await bind.sessionToggleOption(sessionId: sessionId, value: 'disable-audio');
   }
   await bind.sessionPeerOption(
-      sessionId: sessionId, name: 'hx-data-mode-now', value: low ? 'low' : 'high');
+      sessionId: sessionId, name: 'hx-data-mode-now', value: mode);
+  // Remember the Wi-Fi choice: next connections off a hotspot start in ultra (or back in high).
+  if (mode != 'low') {
+    await bind.mainSetLocalOption(
+        key: 'hx-wifi-quality', value: mode == 'ultra' ? 'ultra' : '');
+  }
 }
 
 Future<List<TRadioMenu<String>>> toolbarImageQuality(
@@ -865,11 +883,20 @@ Future<List<TRadioMenu<String>>> toolbarImageQuality(
         '';
     if (now == 'low') groupValue = _kHxDataLow;
     if (now == 'high') groupValue = _kHxDataHigh;
+    if (now == 'ultra') groupValue = _kHxDataUltra;
   }
   onChanged(String? value) async {
     if (value == null) return;
-    if (value == _kHxDataLow || value == _kHxDataHigh) {
-      await hxApplyDataMode(ffi, value == _kHxDataLow);
+    if (value == _kHxDataLow) {
+      await hxApplyDataMode(ffi, 'low');
+      return;
+    }
+    if (value == _kHxDataHigh) {
+      await hxApplyDataMode(ffi, 'high');
+      return;
+    }
+    if (value == _kHxDataUltra) {
+      await hxApplyDataMode(ffi, 'ultra');
       return;
     }
     await bind.sessionPeerOption(
@@ -887,6 +914,12 @@ Future<List<TRadioMenu<String>>> toolbarImageQuality(
     TRadioMenu<String>(
       child: Text('고데이터 (와이파이)'),
       value: _kHxDataHigh,
+      groupValue: groupValue,
+      onChanged: onChanged,
+    ),
+    TRadioMenu<String>(
+      child: Text('초고화질 (빠른 와이파이·유선)'),
+      value: _kHxDataUltra,
       groupValue: groupValue,
       onChanged: onChanged,
     ),
