@@ -22,6 +22,11 @@ TRAY="$HOME/Library/LaunchAgents/com.hydroxpand.hxremote.tray.plist"
 SRV="$HOME/Library/LaunchAgents/com.hydroxpand.hxremote.server.plist"   # "--server", since 261113
 DIR="$HOME/Library/Application Support/HX-Remote-Updater"
 MARK="$DIR/build.txt"          # "<tag> <arch>" of the installed build
+# Copy of the app that runs the menu bar icon and "--server" under its own bundle id. With all three
+# processes under com.carriez.rustdesk, macOS automation (Claude computer use app_* tools, AppleScript
+# by bundle id) picked the tray process and never saw the app's windows (261122).
+SVC="$DIR/HX Remote Service.app"
+SVC_ID="com.hydroxpand.hxremote.service"
 LOG="$DIR/update.log"
 mkdir -p "$DIR"
 # "update now" button in the app drops this flag: skip the idle wait
@@ -44,11 +49,44 @@ stop_app() {
   for _ in $(seq 1 20); do pgrep -f "$PAT" >/dev/null || break; sleep 0.5; done
   pkill -f "$PAT" 2>/dev/null; sleep 1
 }
+make_service() {
+  # fresh copy of the app with its own bundle id, menu bar only, no rustdesk:// links, ad-hoc signed
+  rm -rf "$SVC"
+  ditto "$APP" "$SVC" || { log "service copy failed"; rm -rf "$SVC"; return 1; }
+  local P="$SVC/Contents/Info.plist" B=/usr/libexec/PlistBuddy
+  $B -c "Set :CFBundleIdentifier $SVC_ID" "$P"
+  $B -c "Set :CFBundleName HX Remote Service" -c "Set :CFBundleDisplayName HX Remote Service" "$P"
+  $B -c "Delete :CFBundleURLTypes" "$P" 2>/dev/null
+  $B -c "Delete :LSUIElement" -c "Add :LSUIElement bool true" "$P"
+  codesign --force --deep -s - "$SVC" 2>/dev/null || { log "service signing failed"; rm -rf "$SVC"; return 1; }
+  cat "$MARK" > "$SVC/Contents/hx-build.txt" 2>/dev/null
+  log "service copy made ($(cat "$MARK" 2>/dev/null))"
+}
 start_tray() {
-  # point the menu bar agent at the current app name, then load it
-  [ -f "$TRAY" ] && sed -i '' 's#Applications/RustDesk\.app#Applications/HX Remote.app#g' "$TRAY"
-  [ -f "$TRAY" ] && launchctl bootstrap "gui/$(id -u)" "$TRAY" 2>/dev/null
-  [ -f "$SRV" ] && launchctl bootstrap "gui/$(id -u)" "$SRV" 2>/dev/null
+  # the menu bar and server agents run the service copy (made from the current app when missing or stale)
+  if [ -d "$APP" ] && { [ ! -d "$SVC" ] || ! cmp -s "$MARK" "$SVC/Contents/hx-build.txt"; }; then make_service; fi
+  local EXE="$APP/Contents/MacOS/RustDesk"
+  [ -d "$SVC" ] && EXE="$SVC/Contents/MacOS/RustDesk"
+  for F in "$TRAY" "$SRV"; do
+    [ -f "$F" ] || continue
+    /usr/libexec/PlistBuddy -c "Set :ProgramArguments:0 $EXE" "$F"
+    launchctl bootstrap "gui/$(id -u)" "$F" 2>/dev/null
+  done
+}
+# move the tray and server agents to the service copy (installs made before 261122), or remake a
+# stale copy, without waiting for the next release; the running app window is left alone
+fix_service() {
+  [ -d "$APP" ] && [ -z "${HX_DRY:-}" ] || return 0
+  local need=0
+  [ -d "$SVC" ] && cmp -s "$MARK" "$SVC/Contents/hx-build.txt" || need=1
+  for F in "$TRAY" "$SRV"; do
+    [ -f "$F" ] && ! grep -q "HX Remote Service.app" "$F" && need=1
+  done
+  [ "$need" = 0 ] && return 0
+  launchctl bootout "gui/$(id -u)/com.hydroxpand.hxremote.tray" 2>/dev/null
+  launchctl bootout "gui/$(id -u)/com.hydroxpand.hxremote.server" 2>/dev/null
+  pkill -f "MacOS/RustDesk --(tray|server)\$" 2>/dev/null; sleep 2
+  start_tray
 }
 
 # one-time rename RustDesk.app -> HX Remote.app (not while someone is using the Mac)
@@ -104,7 +142,7 @@ if [ ! -d "$APP" ] || [ -z "$CUR_TAG" ]; then NEED=1
 elif [ "$(ver "$TAG")" \> "$(ver "$CUR_TAG")" ]; then NEED=1
 elif [ "$TAG" = "$CUR_TAG" ] && [ "$CUR_ARCH" = "x86_64" ] && [ "$ARCH" = "aarch64" ]; then NEED=1
 fi
-[ "$NEED" = 0 ] && { [ -n "${HX_DRY:-}${HX_VERBOSE:-}" ] && echo "up to date: $CUR_TAG $CUR_ARCH"; exit 0; }
+[ "$NEED" = 0 ] && { fix_service; [ -n "${HX_DRY:-}${HX_VERBOSE:-}" ] && echo "up to date: $CUR_TAG $CUR_ARCH"; exit 0; }
 
 RUNNING=0
 pgrep -f "$PAT\$" >/dev/null && RUNNING=1
