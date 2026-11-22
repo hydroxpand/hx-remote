@@ -1240,6 +1240,75 @@ class InputModel {
   }
 
   /// Send Key Event
+  // HX: a key that an automation tool posted to the Mac app while this window was
+  // in the background (see HXBackgroundKeys in MainFlutterWindow.swift). Plain text
+  // goes as a string, so it does not depend on the keyboard layout or input method
+  // of either side; other keys (Enter, Backspace, arrows, shortcuts) go as physical
+  // keys, with any modifier the event carries pressed around them.
+  int _hxBgHeld = 0;
+  static const _hxShift = 1 << 17, _hxCtrl = 1 << 18, _hxAlt = 1 << 19, _hxCmd = 1 << 20;
+  static const _hxModKeys = {
+    _hxShift: 0xe1, // ShiftLeft
+    _hxCtrl: 0xe0, // ControlLeft
+    _hxAlt: 0xe2, // AltLeft
+    _hxCmd: 0xe3, // MetaLeft
+  };
+  static int _hxMaskOfKeyCode(int keyCode) {
+    switch (keyCode) {
+      case 56:
+      case 60:
+        return _hxShift;
+      case 59:
+      case 62:
+        return _hxCtrl;
+      case 58:
+      case 61:
+        return _hxAlt;
+      case 55:
+      case 54:
+        return _hxCmd;
+    }
+    return 0;
+  }
+
+  void _hxPressMods(int mask, bool down) {
+    _hxModKeys.forEach((m, hid) {
+      if (mask & m != 0) newKeyboardMode('', hid, down, false);
+    });
+  }
+
+  void hxBackgroundKey(Map<dynamic, dynamic> a) {
+    if (isViewOnly || isViewCamera || !keyboardPerm) return;
+    final type = a['type'] as String? ?? '';
+    final keyCode = (a['keyCode'] as int?) ?? -1;
+    final mods = (a['mods'] as int?) ?? 0;
+    final physical = kMacOsToPhysicalKey[keyCode];
+    if (type == 'flags') {
+      final mask = _hxMaskOfKeyCode(keyCode);
+      if (mask == 0 || physical == null) return;
+      final down = mods & mask != 0;
+      _hxBgHeld = down ? (_hxBgHeld | mask) : (_hxBgHeld & ~mask);
+      newKeyboardMode('', physical.usbHidUsage & 0xFFFF, down, false);
+      return;
+    }
+    final down = type == 'down';
+    final chars = (a['chars'] as String?) ?? '';
+    final combo = mods & (_hxCtrl | _hxAlt | _hxCmd) != 0;
+    final isText = chars.isNotEmpty &&
+        !combo &&
+        chars.runes.every(
+            (r) => r >= 0x20 && r != 0x7f && !(r >= 0xF700 && r <= 0xF8FF));
+    if (isText) {
+      if (down) bind.sessionInputString(sessionId: sessionId, value: chars);
+      return;
+    }
+    if (physical == null) return;
+    final extra = mods & (_hxShift | _hxCtrl | _hxAlt | _hxCmd) & ~_hxBgHeld;
+    if (down) _hxPressMods(extra, true);
+    newKeyboardMode('', physical.usbHidUsage & 0xFFFF, down, false);
+    if (!down) _hxPressMods(extra, false);
+  }
+
   void newKeyboardMode(
       String character, int usbHid, bool down, bool iosCapsLock) {
     final lockModes = _buildLockModes(iosCapsLock);

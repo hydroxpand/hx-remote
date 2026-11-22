@@ -35,6 +35,67 @@ class RelativeMouseState {
     private init() {}
 }
 
+// HX: key presses that automation tools (Claude computer use, scripts) post to this
+// app while it is in the background. macOS gives them to no window (an inactive app
+// has no key window), so typing into a remote window that is not in front was lost
+// while clicks worked (261122). A local monitor catches them and sends them over
+// "hx/bgkeys" to the remote window clicked last; Dart forwards them to the peer
+// (InputModel.hxBackgroundKey). Real typing never reaches an inactive app, so the
+// app in front is unaffected.
+final class HXWeakController {
+    weak var value: FlutterViewController?
+    init(_ value: FlutterViewController) { self.value = value }
+}
+
+final class HXBackgroundKeys {
+    static let shared = HXBackgroundKeys()
+    private var channels: [(controller: HXWeakController, channel: FlutterMethodChannel)] = []
+    private weak var lastWindow: NSWindow?
+    private var monitor: Any?
+
+    func register(_ controller: FlutterViewController) {
+        channels.removeAll { $0.controller.value == nil }
+        let channel = FlutterMethodChannel(name: "hx/bgkeys", binaryMessenger: controller.engine.binaryMessenger)
+        channels.append((HXWeakController(controller), channel))
+        install()
+    }
+
+    private func channel(for window: NSWindow?) -> FlutterMethodChannel? {
+        guard let window = window else { return nil }
+        return channels.first(where: { $0.controller.value?.view.window === window })?.channel
+    }
+
+    private func install() {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown, .keyUp, .flagsChanged]
+        ) { [weak self] event in
+            guard let self = self, !NSApp.isActive else { return event }
+            switch event.type {
+            case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+                if let w = event.window { self.lastWindow = w }
+                return event
+            default:
+                let target = self.channel(for: event.window) ?? self.channel(for: self.lastWindow)
+                    ?? NSApp.orderedWindows.lazy.compactMap { self.channel(for: $0) }.first
+                guard let ch = target else { return event }
+                var args: [String: Any] = [
+                    "keyCode": Int(event.keyCode),
+                    "mods": Int(event.modifierFlags.rawValue),
+                ]
+                if event.type == .flagsChanged {
+                    args["type"] = "flags"
+                } else {
+                    args["type"] = event.type == .keyDown ? "down" : "up"
+                    args["chars"] = event.characters ?? ""
+                }
+                ch.invokeMethod("key", arguments: args)
+                return nil
+            }
+        }
+    }
+}
+
 class MainFlutterWindow: NSWindow {
     private static let fullscreenWorkAreaSizes = NSMapTable<NSWindow, NSValue>(
         keyOptions: [.weakMemory, .objectPointerPersonality],
@@ -69,6 +130,7 @@ class MainFlutterWindow: NSWindow {
         RegisterGeneratedPlugins(registry: flutterViewController)
 
         FlutterMultiWindowPlugin.setOnWindowCreatedCallback { controller in
+            HXBackgroundKeys.shared.register(controller)
             // Register the plugin which you want access from other isolate.
             // DesktopLifecyclePlugin.register(with: controller.registrar(forPlugin: "DesktopLifecyclePlugin"))
             // Note: copy below from above RegisterGeneratedPlugins

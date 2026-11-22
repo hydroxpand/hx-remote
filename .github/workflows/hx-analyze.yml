@@ -49,6 +49,8 @@ jobs:
             lib/common/widgets/peers_view.dart \
             lib/desktop/pages/desktop_home_page.dart \
             lib/models/peer_tab_model.dart \
+            lib/models/input_model.dart \
+            lib/desktop/pages/remote_tab_page.dart \
             lib/models/ab_model.dart \
             lib/consts.dart
 
